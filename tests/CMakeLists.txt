@@ -4,7 +4,7 @@ FetchContent_Declare(googletest
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
-add_executable(pdaf_tests test_smoke.cpp test_depth_estimator.cpp test_cost_engine.cpp test_lens_mapper.cpp)
+add_executable(pdaf_tests test_smoke.cpp test_depth_estimator.cpp test_cost_engine.cpp test_lens_mapper.cpp test_null_actuator.cpp)
 target_link_libraries(pdaf_tests PRIVATE pdaf GTest::gtest_main)
 
 include(GoogleTest)
