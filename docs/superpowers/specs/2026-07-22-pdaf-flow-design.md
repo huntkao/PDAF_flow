@@ -24,10 +24,12 @@
 
 1. **HAL 層**：`IPdDataSource`、`ILensActuator`。模擬器與 dump 重播是這兩個介面的不同實作；上層不知道資料真假，日後接真硬體只需再寫一組實作。
 2. **演算法層**：M1/M2/M3 各一個純虛擬介面 + 參考實作，模塊間只透過明確定義的資料結構溝通。
-3. **控制層**：`AfController` 狀態機 + 統一 config 系統。
+3. **控制層**：`AfController` 狀態機 + `PdafPipeline`（M1+M2 組合的 estimator 包裝）+ 統一 config 系統。
 4. **應用層**：CLI runner、frame loop、逐 frame CSV 記錄。
 
-`AfController` 只依賴五個介面（兩個 HAL + 三個演算法），是「以實際硬體應用角度」的落實。
+`AfController` 只依賴四個介面（兩個 HAL、estimator、M3 lens mapper），完全不知道背後是模擬器還是真硬體，也不直接碰 M1/M2——是「以實際硬體應用角度」的落實。
+
+本設計已對照 Qualcomm 方案（CamX stats 架構、PDLib、HAF）檢視並納入四項修正：frame metadata 帶曝光當下 lens 位置、HW 統計路徑（`PdInput` variant）、動態 ROI（`AfRequest`）、HAF 式仲裁縫（`PdafPipeline`）。模塊對應關係：PDLib ≈ M1+M2+DCC 套用；本設計把 DCC 獨立為 M3，介面責任更清楚。
 
 ## 目錄結構
 
@@ -53,11 +55,13 @@ PDAF_flow/
 
 模塊間唯一的溝通語言：
 
-- `PdFrame`：一個 frame 的 phase pixel 資料。抽象化設計：每個 ROI 的左/右通道 sample 陣列 + `PdPatternDesc`（pattern 幾何描述：型態、pitch、取樣佈局，由 config 提供）。
-- `CostSequence`：M1 輸出。每個 ROI 一條：shift 範圍內逐點 matching cost + 有效 sample 數。
+- `PdFrame`：一個 frame 的 phase pixel 資料。抽象化設計：每個 ROI 的左/右通道 sample 陣列 + `PdPatternDesc`（pattern 幾何描述：型態、pitch、取樣佈局，由 config 提供）。**必帶 metadata：`frame_id`、`timestamp`、`lens_step_at_exposure`（曝光當下的 lens 位置）**——實機 stats 有 pipeline 延遲，M3 換算目標位置必須以量測當下的位置為基準，不能用「現在」的位置（對齊 Qualcomm stats 的 frame tagging 作法；CAF 擴充的前提）。
+- `PdInput`：HAL 資料來源的輸出，tagged variant：**raw `PdFrame` 或已算好的 `CostSequence[]` 二擇一**。近代平台 PD 校正與 correlation 常由 ISP 硬體算完（M1 被硬體取代），此設計預留 HW 統計路徑；demo 全走 raw 路徑。
+- `CostSequence`：M1 輸出（或由 HW 統計直接提供）。每個 ROI 一條：shift 範圍內逐點 matching cost + 有效 sample 數。
 - `DepthEstimate`：M2 輸出。每個 ROI 的 disparity（sub-pixel）+ confidence（0~1）+ 判定旗標。
 - `LensCommand`：M3 輸出。目標 VCM step + 預期誤差範圍。
 - `LensStatus`：actuator 回報。目前 step、是否移動中。
+- `AfRequest`：每個 frame 進 `onFrame()` 的請求，攜帶當前 ROI 清單（touch AF、人臉框等動態來源）；config 只提供預設 ROI。
 
 ## 模塊介面與參考實作
 
@@ -67,11 +71,15 @@ PDAF_flow/
 |---|---|---|---|
 | M1 | `IPdCostEngine` | `init(calib, pattern)`、`compute(PdFrame, rois) → CostSequence[]` | gain 校正（LRC/SPC）後做 SAD cost |
 | M2 | `IDepthEstimator` | `estimate(CostSequence) → DepthEstimate` | cost 極小值 + 拋物線內插 sub-pixel；confidence 由曲線深度/平坦度導出 |
-| M3 | `ILensMapper` | `init(DccTable)`、`toLensCommand(DepthEstimate, currentStep) → LensCommand` | disparity→defocus 線性轉換 + DCC 錨點內插 |
+| M3 | `ILensMapper` | `init(DccTable)`、`toLensCommand(DepthEstimate, lensStepAtExposure) → LensCommand` | disparity→defocus 線性轉換 + DCC 錨點內插；基準位置用曝光當下的 lens step |
+
+### PdafPipeline（控制層的仲裁縫）
+
+控制層提供 `PdafPipeline` 類別包住 M1+M2 的組合（含 `PdInput` 的 raw/HW 路徑分流），對 `AfController` 呈現為單一「focus estimator」介面（輸出 `DepthEstimate`）。controller 只認 estimator 介面，不直接依賴 M1/M2——對齊 Qualcomm HAF 把每種對焦技術（PDAF、contrast、TOF）做成插件仲裁的架構，將來加 contrast fallback 或 TOF 輔助時不需改 controller。M3 維持獨立（lens 換算不是估測技術）。
 
 ## HAL 介面
 
-- `IPdDataSource::capture() → PdFrame` — 模擬器或 replay 實作
+- `IPdDataSource::capture() → PdInput` — 模擬器或 replay 實作；輸出為 raw `PdFrame` 或 HW 已算好的 `CostSequence[]`（tagged variant），並一律附 frame metadata（frame_id、timestamp、lens_step_at_exposure）
 - `ILensActuator::moveTo(step)` / `getStatus() → LensStatus` — 模擬器實作含 settle time 模擬；replay 模式用 null actuator
 
 ## AfController 狀態機
@@ -85,18 +93,18 @@ IDLE ──trigger()──▶ MEASURING ──▶ MOVING ──▶ SETTLING ─�
                                                                └──▶ FAILED
 ```
 
-- `MEASURING`：capture → M1 → M2，取得 disparity/confidence
+- `MEASURING`：capture → `PdafPipeline`（M1 → M2，或 HW 統計直入 M2），取得 disparity/confidence
 - `MOVING`：confidence 足夠 → M3 產生 `LensCommand` 下給 actuator；不足 → 重試，超過 `max_retries` 進 `FAILED`
 - `SETTLING`：等 actuator 回報停止（VCM 物理 settle；實際產品必等此步）
 - `VERIFYING`：再量一次，`|disparity| < in_focus_threshold` 即 `FOCUSED`；否則帶新量測回修，超過 `max_iterations` 進 `FAILED`
 
-驅動方式為逐 frame 的 `AfController::onFrame()`——產品 AF 的實際型態（每個 sensor frame 踢一次狀態機）。日後 CAF 只需在 `FOCUSED` 後加場景監測轉移，不改架構。每次 `onFrame` 輸出一筆 `AfFrameLog`（狀態、disparity、confidence、lens step 等）供記錄。
+驅動方式為逐 frame 的 `AfController::onFrame(AfRequest)`——產品 AF 的實際型態（每個 sensor frame 踢一次狀態機），`AfRequest` 攜帶當前 frame 的動態 ROI。日後 CAF 只需在 `FOCUSED` 後加場景監測轉移，不改架構。每次 `onFrame` 輸出一筆 `AfFrameLog`（狀態、disparity、confidence、lens step 等）供記錄。
 
 ## Config 系統
 
 單一 JSON，啟動時載入，四個區塊對應實際產品 tuning 分工：
 
-- `sensor`：PD pattern 描述（型態、pitch、ROI 幾何）
+- `sensor`：PD pattern 描述（型態、pitch）與預設 ROI 幾何（執行期 ROI 由 `AfRequest` 動態帶入，config 僅為預設值）
 - `calibration`：LRC/SPC gain 表、DCC 錨點表（demo 用內建預設值，可指向外部檔案）
 - `tuning`：cost shift 範圍、confidence 門檻、in-focus 門檻、retry/iteration 上限
 - `system`：資料來源選擇（sim/replay）、模擬器場景參數、log 路徑
