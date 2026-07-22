@@ -11,11 +11,16 @@ namespace {
 
 using nlohmann::json;
 
+// Helper to compose field path: avoid leading dot for top-level fields
+auto composePath = [](const std::string& path, const std::string& key) -> std::string {
+  return path.empty() ? key : path + "." + key;
+};
+
 // fail-fast：缺欄位即丟出含完整路徑的錯誤
 const json& req(const json& j, const std::string& key, const std::string& path) {
   auto it = j.find(key);
   if (it == j.end())
-    throw std::runtime_error("config: missing field '" + path + "." + key + "'");
+    throw std::runtime_error("config: missing field '" + composePath(path, key) + "'");
   return *it;
 }
 
@@ -24,7 +29,7 @@ T reqAs(const json& j, const std::string& key, const std::string& path) {
   try {
     return req(j, key, path).get<T>();
   } catch (const json::exception&) {
-    throw std::runtime_error("config: bad type for '" + path + "." + key + "'");
+    throw std::runtime_error("config: bad type for '" + composePath(path, key) + "'");
   }
 }
 

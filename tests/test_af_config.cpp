@@ -48,3 +48,14 @@ TEST(AfConfig, BadModeThrows) {
 TEST(AfConfig, MissingFileThrows) {
   EXPECT_THROW(AfConfig::loadFromFile("/no/such/file.json"), std::runtime_error);
 }
+
+TEST(AfConfig, MissingTopLevelSectionHasCleanPath) {
+  try {
+    AfConfig::loadFromJson("{}");
+    FAIL() << "should throw";
+  } catch (const std::runtime_error& e) {
+    const std::string msg = e.what();
+    EXPECT_NE(msg.find("'sensor'"), std::string::npos) << msg;
+    EXPECT_EQ(msg.find("'.sensor'"), std::string::npos) << msg;
+  }
+}
