@@ -29,6 +29,20 @@ flowchart LR
 
 公開介面在 `include/pdaf/`，參考實作在 `src/`。核心編為 `libpdaf`（static），CLI 與測試連結它。C++17、不依賴 OpenCV。
 
+### 對照 Qualcomm 方案
+
+分層方式參考市面典型的 Qualcomm 相機 AF 堆疊（CamX-CHI / PDLib / HAF 的概念）。下圖左為該堆疊的簡化概念參考，右為 PDAF_flow 的對應：
+
+![典型 Qualcomm AF 堆疊與 PDAF_flow 分層架構對比](docs/qualcomm_arch.svg)
+
+> 左側為依公開資料整理的簡化概念參考，**非官方架構圖**；名稱與分層僅為概念對應。
+
+兩者最主要的差別在演算法庫這一層：
+
+- **模組邊界**：Qualcomm 的 PDLib 把「深度估測 + DCC 套用」統包在一起（PD 校正也常在 stats/ISP 前端完成）；PDAF_flow 把這些拆成 **M1（相位 cost）、M2（估測）、M3（DCC→VCM）** 三個純介面，各自可獨立替換與測試，DCC 獨立為 M3 讓介面責任更清楚。
+- **仲裁縫**：HAF 是多模態混合對焦（PDAF / contrast / TOF 仲裁）；PDAF_flow 的 `PdafPipeline`（`IFocusEstimator`）是同一種仲裁縫，目前只掛 PDAF——加 contrast/TOF 需擴充 `PdInput` 的資料型別。
+- **HW stats 路徑**：近代平台的 PD 相關/校正逐漸由 ISP 硬體算完；PDAF_flow 的 `PdInput` 預留 raw 樣本或 `hw_costs` 兩條路徑對應（HW 路徑會跳過 M1）。
+
 ## 建置與執行
 
 ```bash
