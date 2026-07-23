@@ -1,0 +1,403 @@
+<title>ParabolicDepthEstimator 原理</title>
+<style>
+  :root{
+    color-scheme:light;
+    --plane:#eceae4; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+    --grid:#e6e5df; --axis:#c3c2b7; --border:rgba(11,11,11,.10);
+    --blue:#2a78d6; --emph:#eb6834; --mag:#c23f76; --good:#0f8a3c;
+    --code-bg:#f4f5f3;
+    --shadow:0 1px 2px rgba(11,11,11,.05),0 12px 40px rgba(11,11,11,.10);
+  }
+  @media (prefers-color-scheme:dark){:root:where(:not([data-theme=light])){
+    color-scheme:dark;
+    --plane:#0b0b0b; --surface:#191918; --ink:#fff; --ink2:#c3c2b7; --muted:#8f8d86;
+    --grid:#2c2c2a; --axis:#3a3a37; --border:rgba(255,255,255,.12);
+    --blue:#4f9bf0; --emph:#f2814e; --mag:#e2739e; --good:#37c26a;
+    --code-bg:#111110;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 14px 44px rgba(0,0,0,.55);
+  }}
+  :root[data-theme=dark]{
+    color-scheme:dark;
+    --plane:#0b0b0b; --surface:#191918; --ink:#fff; --ink2:#c3c2b7; --muted:#8f8d86;
+    --grid:#2c2c2a; --axis:#3a3a37; --border:rgba(255,255,255,.12);
+    --blue:#4f9bf0; --emph:#f2814e; --mag:#e2739e; --good:#37c26a;
+    --code-bg:#111110;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 14px 44px rgba(0,0,0,.55);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--plane); color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif; line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+    display:flex; align-items:center; justify-content:center; min-height:100vh; padding:24px;
+  }
+  .deck{width:min(1000px,96vw); }
+  .stage{
+    position:relative; background:var(--surface); border:1px solid var(--border);
+    border-radius:16px; box-shadow:var(--shadow); overflow:hidden;
+    min-height:600px;
+  }
+  .slide{
+    position:absolute; inset:0; padding:38px 46px 30px;
+    display:flex; flex-direction:column; gap:14px;
+    opacity:0; visibility:hidden; transform:translateX(14px);
+    transition:opacity .32s ease, transform .32s ease;
+  }
+  .slide.active{opacity:1; visibility:visible; transform:none; position:relative;}
+  @media (prefers-reduced-motion:reduce){.slide{transition:none}}
+  .kicker{font-size:12px; letter-spacing:.15em; text-transform:uppercase; color:var(--blue); font-weight:700; margin:0;}
+  h1{font-size:clamp(22px,3vw,31px); line-height:1.14; margin:2px 0 0; font-weight:700; letter-spacing:-.01em; text-wrap:balance;}
+  h2{font-size:clamp(19px,2.4vw,25px); line-height:1.2; margin:2px 0 0; font-weight:680; letter-spacing:-.01em; text-wrap:balance;}
+  p.lede{margin:0; color:var(--ink2); font-size:15.5px; max-width:70ch;}
+  .plotwrap{flex:1; display:flex; align-items:center; justify-content:center; min-height:0;}
+  .plotwrap.two{gap:20px;}
+  svg{display:block; width:100%; height:auto;}
+  .cap{font-size:12.5px; color:var(--muted); margin:0;}
+  .row{display:flex; gap:26px; align-items:center; flex-wrap:wrap;}
+  .col{flex:1; min-width:260px;}
+
+  .tick{fill:var(--muted); font-size:12px; font-variant-numeric:tabular-nums;}
+  .axlab{fill:var(--muted); font-size:12px; letter-spacing:.03em;}
+  .anno{font-size:12.5px; font-variant-numeric:tabular-nums;}
+
+  .formula{
+    font-family:ui-monospace,"SF Mono",Menlo,monospace; font-size:14.5px;
+    background:var(--code-bg); border:1px solid var(--border); border-radius:9px;
+    padding:12px 14px; color:var(--ink); display:inline-block; letter-spacing:.01em;
+  }
+  .formula .hl{color:var(--emph); font-weight:700;}
+  .formula .b{color:var(--blue); font-weight:700;}
+  .formula .mg{color:var(--mag); font-weight:700;}
+  ul.pts{margin:2px 0 0; padding-left:0; list-style:none; display:flex; flex-direction:column; gap:7px;}
+  ul.pts li{font-size:14.5px; color:var(--ink2); padding-left:20px; position:relative;}
+  ul.pts li::before{content:""; position:absolute; left:0; top:8px; width:8px; height:8px; border-radius:2px; background:var(--blue);}
+  ul.pts li.e::before{background:var(--emph);}
+  ul.pts li.m::before{background:var(--mag);}
+  ul.pts li b{color:var(--ink); font-weight:640;}
+  code.inl{font-family:ui-monospace,Menlo,monospace; font-size:13px; background:var(--code-bg); padding:1px 5px; border-radius:4px;}
+  pre.code{
+    margin:0; background:var(--code-bg); border:1px solid var(--border); border-radius:9px;
+    padding:14px 16px; overflow-x:auto; font-family:ui-monospace,Menlo,monospace;
+    font-size:12px; line-height:1.6; color:var(--ink2);
+  }
+  pre.code .k{color:var(--blue);} pre.code .c{color:var(--muted);} pre.code .h{color:var(--emph); font-weight:600;} pre.code .g{color:var(--mag); font-weight:600;}
+
+  .pipe{display:flex; gap:8px; align-items:center; font-size:13px; color:var(--muted); font-weight:600;}
+  .pipe .m2{color:var(--blue); background:color-mix(in oklab,var(--blue) 14%,transparent); padding:2px 9px; border-radius:6px;}
+  .pipe .a{color:var(--muted);}
+
+  .bar{display:flex; align-items:center; justify-content:space-between; margin-top:16px; gap:14px;}
+  .dots{display:flex; gap:8px;}
+  .dot{width:9px; height:9px; border-radius:50%; background:var(--axis); border:none; padding:0; cursor:pointer;}
+  .dot.on{background:var(--blue);}
+  .nav{display:flex; gap:8px; align-items:center;}
+  .nav button{
+    font:inherit; font-size:13px; color:var(--ink); background:var(--surface);
+    border:1px solid var(--border); border-radius:8px; padding:6px 12px; cursor:pointer;
+  }
+  .nav button:hover{border-color:var(--blue);}
+  .nav button:disabled{opacity:.4; cursor:default;}
+  .count{font-size:12.5px; color:var(--muted); font-variant-numeric:tabular-nums; min-width:42px; text-align:center;}
+  button:focus-visible,.dot:focus-visible{outline:2px solid var(--blue); outline-offset:2px;}
+</style>
+
+<div class="deck">
+  <div class="stage" id="stage">
+
+    <!-- 1 -->
+    <section class="slide active">
+      <p class="kicker">M2 · ParabolicDepthEstimator</p>
+      <h1>從 cost sequence 求 sub-pixel 視差與信心值</h1>
+      <p class="lede">PDAF pipeline 的第二模組（M2）。輸入是 M1 對每個候選位移算出的相位匹配成本曲線，輸出一個 <b>sub-pixel 的 disparity</b> 與一個 <b>0–1 的 confidence</b>。原理：拋物線內插找谷底，再由谷的<b>深度、曲率、有無競爭谷</b>三個因子評估可信度。</p>
+      <div class="pipe" style="margin-top:2px;"><span class="a">M1 相位 cost</span><span class="a">→</span><span class="m2">M2 深度估測</span><span class="a">→</span><span class="a">M3 DCC→VCM</span></div>
+      <div class="plotwrap"><svg id="p1" viewBox="0 0 860 320"></svg></div>
+      <p class="cap">成本曲線在真實視差附近有一個谷；M2 的工作就是精準定位這個谷底、並評估它有多可信。</p>
+    </section>
+
+    <!-- 2 -->
+    <section class="slide">
+      <p class="kicker">輸入</p>
+      <h2>matching cost sequence：越吻合，成本越低</h2>
+      <p class="lede">M1 把左右相位像素相對位移 <code class="inl">s</code>，逐點算 SAD（絕對差和）。位移對齊真實視差時左右最吻合、成本最低，形成一條有谷的曲線 <code class="inl">cost[s]</code>。</p>
+      <div class="plotwrap"><svg id="p2" viewBox="0 0 860 340"></svg></div>
+      <p class="cap">離散樣本只在整數位移上取得；最低的整數點（橘）是視差的粗估，但真正的谷底通常落在兩個樣本之間。</p>
+    </section>
+
+    <!-- 3 -->
+    <section class="slide">
+      <p class="kicker">核心 · sub-pixel 內插</p>
+      <h2>用谷底三點擬合拋物線，頂點即 sub-pixel 視差</h2>
+      <div class="row">
+        <div class="col" style="flex:1.35;">
+          <div class="plotwrap"><svg id="p3" viewBox="0 0 520 360"></svg></div>
+        </div>
+        <div class="col">
+          <p class="lede" style="margin-bottom:12px;">取最低整數點與左右鄰點 <code class="inl">c₋₁, c₀, c₊₁</code>，唯一穿過三點的拋物線其頂點偏移量：</p>
+          <div class="formula">δ = <span class="hl">½·(c₋₁ − c₊₁)</span> / (c₋₁ − 2c₀ + c₊₁)</div>
+          <ul class="pts" style="margin-top:14px;">
+            <li>整數最小點 <b>s = 2</b>，成本 0.056</li>
+            <li>三點 = <b>0.064, 0.056, 0.123</b></li>
+            <li class="e">δ = <b>−0.394</b> → 視差 = 2 + δ = <b>1.606</b></li>
+            <li>真值 1.600，<b>誤差 0.006</b>（sub-pixel 精度）</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4 confidence 三因子 -->
+    <section class="slide">
+      <p class="kicker">confidence · 三因子</p>
+      <h2>深度 × 無歧義 × 曲率</h2>
+      <div class="row">
+        <div class="col" style="flex:1.3;">
+          <div class="plotwrap"><svg id="p4" viewBox="0 0 560 350"></svg></div>
+        </div>
+        <div class="col">
+          <div class="formula">confidence = <span class="b">depth</span> × <span class="mg">unamb</span> × (0.5 + 0.5·<span class="hl">sharp</span>)</div>
+          <ul class="pts" style="margin-top:14px;">
+            <li><b>depth</b> = 1 − c_min/c̄：谷相對平均有多深（尺度不變）</li>
+            <li class="e"><b>sharp</b> = 1 − 2c₀/(c₋₁+c₊₁)：谷底轉得多急（曲率）</li>
+            <li class="m"><b>unamb</b>：有沒有競爭谷（下一張）</li>
+            <li>圖中兩谷深度相近，但窄谷 <b>0.75</b> &gt; 寬谷 <b>0.53</b>——曲率反映定位精度</li>
+          </ul>
+        </div>
+      </div>
+      <p class="cap">曲率是輕度折扣（最多對折）：寬但清楚的谷估值仍正確、只是較不精準，不該打死。</p>
+    </section>
+
+    <!-- 5 basin-walk -->
+    <section class="slide">
+      <p class="kicker">unamb · 次低點檢查</p>
+      <h2>basin-walk：只有被山脊隔開的谷才算「競爭」</h2>
+      <p class="lede">unamb 找主谷以外的最低成本，越接近谷底越歧義。關鍵是「以外」怎麼定義——排除主谷<b>整段單調 basin</b>（從谷底往兩側走到成本回升為止），而非固定寬度，否則寬谷會把自己的坡誤判成第二個谷。</p>
+      <div class="plotwrap two">
+        <div style="flex:1;">
+          <svg id="p5a" viewBox="0 0 400 300"></svg>
+          <p class="cap" style="text-align:center;">寬單峰谷：整段 basin（陰影）就是全部 → 無競爭谷 → <b>unamb = 1</b>，conf 0.56</p>
+        </div>
+        <div style="flex:1;">
+          <svg id="p5b" viewBox="0 0 400 300"></svg>
+          <p class="cap" style="text-align:center;">雙峰（aliasing）：山脊外還有深谷（橘）→ <b>unamb → 0</b>，conf 0.04——即使主谷又深又尖</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6 退化情況 -->
+    <section class="slide">
+      <p class="kicker">退化情況</p>
+      <h2>邊界與無紋理的安全處理</h2>
+      <p class="lede">執行期不丟例外，只降級——這是實機 AF 的要求。</p>
+      <div class="plotwrap two">
+        <div style="flex:1;">
+          <svg id="p6a" viewBox="0 0 400 300"></svg>
+          <p class="cap" style="text-align:center;">最小點落在搜尋範圍邊界 → 真谷可能在範圍外，<b>不做內插</b>、confidence <b>×0.5</b></p>
+        </div>
+        <div style="flex:1;">
+          <svg id="p6b" viewBox="0 0 400 300"></svg>
+          <p class="cap" style="text-align:center;">曲線近乎全平（無紋理／c̄≈0）→ 無谷可尋，回傳 <b>invalid、confidence 0</b></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7 程式碼 -->
+    <section class="slide">
+      <p class="kicker">對應程式碼</p>
+      <h2>estimate() 的決策流程</h2>
+      <div class="row" style="align-items:flex-start;">
+        <div class="col" style="flex:1.25;">
+          <pre class="code"><span class="c">// src/algo/parabolic_depth_estimator.cpp</span>
+DepthEstimate estimate(const CostSequence&amp; cost){
+  <span class="k">if</span>(v.size()&lt;3 || valid_samples&lt;=0) <span class="k">return</span> {}; <span class="c">// invalid</span>
+  mi=argmin(v); mean=average(v);
+  <span class="k">if</span>(mean &lt; 1e-6) <span class="k">return</span> {};              <span class="c">// 無紋理</span>
+  depth  = clamp(1 - v[mi]/mean, 0,1);      <span class="h">// 深度</span>
+  [lo,hi]= basin_walk(v, mi);               <span class="g">// 主谷 basin</span>
+  second = min(v outside [lo,hi]);          <span class="g">// 次低點</span>
+  unamb  = clamp((second-v[mi])/(mean-v[mi]),0,1);
+  <span class="k">if</span>(mi==0 || mi==last)                     <span class="c">// 邊界</span>
+    <span class="k">return</span> {shift_min+mi, depth*unamb*0.5f, true};
+  δ      = 0.5*(c₋₁-c₊₁)/(c₋₁-2c₀+c₊₁);     <span class="h">// sub-pixel</span>
+  sharp  = clamp(1 - 2c₀/(c₋₁+c₊₁), 0,1);   <span class="h">// 曲率</span>
+  conf   = depth * unamb * (0.5+0.5*sharp); <span class="c">// 三因子</span>
+  <span class="k">return</span> {shift_min+mi+δ, conf, true};
+}</pre>
+        </div>
+        <div class="col">
+          <ul class="pts">
+            <li>純函式、無狀態；一條 cost 曲線進、一個估測出</li>
+            <li class="e"><b>頂點內插</b>把整數精度提升到 sub-pixel</li>
+            <li><b>信心 = 深度 × 無歧義 × 曲率</b>：分別擋掉離焦/無紋理、aliasing 歧義、寬谷低精度</li>
+            <li class="m"><b>basin-walk</b> 讓寬谷不被誤判成歧義</li>
+            <li>退化路徑全部<b>回傳合法結果</b>，絕不丟例外</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <div class="bar">
+    <div class="dots" id="dots"></div>
+    <div class="nav">
+      <button id="prev" aria-label="上一張">← 上一張</button>
+      <span class="count" id="count">1 / 7</span>
+      <button id="next" aria-label="下一張">下一張 →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const C=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const NS="http://www.w3.org/2000/svg";
+const E=(n,a={})=>{const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);return e;};
+const costW=(s,d,cmin,A,sig)=>cmin+A*(1-Math.exp(-((s-d)**2)/(2*sig*sig)));
+
+function frame(svg,cfg){
+  const {x0,x1,y0v,y1v,px,py,pw,ph,xlab,ylab,xticks,nogrid}=cfg;
+  const sx=x=>px+(x-x0)/(x1-x0)*pw;
+  const sy=y=>py+(1-(y-y0v)/(y1v-y0v))*ph;
+  svg.appendChild(E("line",{x1:px,y1:py+ph,x2:px+pw,y2:py+ph,stroke:C('--axis'),'stroke-width':1}));
+  svg.appendChild(E("line",{x1:px,y1:py,x2:px,y2:py+ph,stroke:C('--axis'),'stroke-width':1}));
+  (xticks||[]).forEach(t=>{
+    const X=sx(t);
+    if(!nogrid) svg.appendChild(E("line",{x1:X,y1:py,x2:X,y2:py+ph,stroke:C('--grid'),'stroke-width':1}));
+    const tx=E("text",{x:X,y:py+ph+20,'text-anchor':'middle',class:'tick'});tx.textContent=t;svg.appendChild(tx);
+  });
+  if(xlab){const t=E("text",{x:px+pw/2,y:py+ph+40,'text-anchor':'middle',class:'axlab'});t.textContent=xlab;svg.appendChild(t);}
+  if(ylab){const t=E("text",{x:px-6,y:py-10,'text-anchor':'start',class:'axlab'});t.textContent=ylab;svg.appendChild(t);}
+  return {sx,sy};
+}
+function curve(svg,pts,sx,sy,color,w=2.5,dash=null){
+  let d=pts.map((p,i)=>(i?'L':'M')+sx(p[0]).toFixed(1)+' '+sy(p[1]).toFixed(1)).join(' ');
+  const a={d,fill:'none',stroke:color,'stroke-width':w,'stroke-linejoin':'round','stroke-linecap':'round'};
+  if(dash)a['stroke-dasharray']=dash; svg.appendChild(E("path",a));
+}
+function dots(svg,xs,ys,sx,sy,color,r=4){
+  xs.forEach((x,i)=>svg.appendChild(E("circle",{cx:sx(x),cy:sy(ys[i]),r,fill:C('--surface'),stroke:color,'stroke-width':2})));
+}
+function band(svg,x0,x1,py,ph,sx,color,op){
+  svg.appendChild(E("rect",{x:sx(x0),y:py,width:sx(x1)-sx(x0),height:ph,fill:color,opacity:op}));
+}
+function label(svg,x,y,txt,color,anchor='middle',weight=640,size=12.5){
+  const t=E("text",{x,y,'text-anchor':anchor,'font-size':size,fill:color,'font-weight':weight,class:'anno'});
+  t.textContent=txt;svg.appendChild(t);return t;
+}
+const XS=[]; for(let s=-6;s<=6;s++)XS.push(s);
+const XS8=[]; for(let s=-8;s<=8;s++)XS8.push(s);
+const fine=(d,cmin,A,sig,a=-6.4,b=6.4)=>{const o=[];for(let s=a;s<=b;s+=0.1)o.push([s,costW(s,d,cmin,A,sig)]);return o;};
+
+function draw(){
+  // 1 — hero
+  (()=>{const svg=document.getElementById('p1'); if(!svg)return; svg.innerHTML='';
+    const {sx,sy}=frame(svg,{x0:-6,x1:6,y0v:0,y1v:0.62,px:56,py:24,pw:748,ph:236,xlab:'左右位移 s',xticks:[-6,-4,-2,0,2,4,6],nogrid:true});
+    curve(svg,fine(1.6,0.05,0.5,2.5),sx,sy,C('--blue'),3);
+    const ys=XS.map(s=>costW(s,1.6,0.05,0.5,2.5)); dots(svg,XS,ys,sx,sy,C('--blue'));
+    const mi=ys.indexOf(Math.min(...ys));
+    svg.appendChild(E("circle",{cx:sx(XS[mi]),cy:sy(ys[mi]),r:6,fill:C('--emph'),stroke:C('--surface'),'stroke-width':2}));
+    label(svg,sx(1.6),sy(0.05)-14,'谷底 ≈ 視差',C('--emph'));
+  })();
+
+  // 2 — cost sequence
+  (()=>{const svg=document.getElementById('p2'); if(!svg)return; svg.innerHTML='';
+    const {sx,sy}=frame(svg,{x0:-6,x1:6,y0v:0,y1v:0.62,px:60,py:20,pw:742,ph:250,xlab:'左右位移 s（整數樣本）',ylab:'SAD cost',xticks:[-6,-4,-2,0,2,4,6]});
+    curve(svg,fine(1.6,0.05,0.5,2.5),sx,sy,C('--blue'),2,'3 4');
+    const ys=XS.map(s=>costW(s,1.6,0.05,0.5,2.5)); dots(svg,XS,ys,sx,sy,C('--blue'),4.5);
+    const mi=ys.indexOf(Math.min(...ys));
+    svg.appendChild(E("circle",{cx:sx(XS[mi]),cy:sy(ys[mi]),r:6.5,fill:C('--emph'),stroke:C('--surface'),'stroke-width':2}));
+    label(svg,sx(2),sy(ys[mi])+26,'最低整數點 s=2',C('--emph'));
+  })();
+
+  // 3 — parabola fit
+  (()=>{const svg=document.getElementById('p3'); if(!svg)return; svg.innerHTML='';
+    const d=1.6,cm=0.05,A=0.5,sig=2.5;
+    const c0=costW(1,d,cm,A,sig),c1=costW(2,d,cm,A,sig),c2=costW(3,d,cm,A,sig);
+    const delta=0.5*(c0-c2)/(c0-2*c1+c2); const vx=2+delta;
+    const {sx,sy}=frame(svg,{x0:0.4,x1:3.6,y0v:0.03,y1v:0.16,px:52,py:24,pw:430,ph:250,xlab:'左右位移 s',xticks:[1,2,3]});
+    curve(svg,fine(d,cm,A,sig,0.4,3.6),sx,sy,C('--muted'),1.5,'2 4');
+    const pa=(c0-2*c1+c2)/2, pb=(c2-c0)/2; const pts=[];
+    for(let t=-1.35;t<=1.35;t+=0.03){const x=2+t; pts.push([x,c1+pb*t+pa*t*t]);}
+    curve(svg,pts,sx,sy,C('--emph'),2.5);
+    dots(svg,[1,2,3],[c0,c1,c2],sx,sy,C('--blue'),5.5);
+    label(svg,sx(1),sy(c0)-12,'c₋₁',C('--blue'),'middle',700);
+    label(svg,sx(2),sy(c1)+24,'c₀',C('--blue'),'middle',700);
+    label(svg,sx(3),sy(c2)-12,'c₊₁',C('--blue'),'middle',700);
+    const vy=c1+pb*delta+pa*delta*delta;
+    svg.appendChild(E("line",{x1:sx(vx),y1:sy(vy),x2:sx(vx),y2:sy(0.03),stroke:C('--emph'),'stroke-width':1.5,'stroke-dasharray':'3 3'}));
+    svg.appendChild(E("circle",{cx:sx(vx),cy:sy(vy),r:6,fill:C('--emph'),stroke:C('--surface'),'stroke-width':2}));
+    label(svg,sx(vx),sy(0.03)+22,'1.606',C('--emph'),'middle',700,13);
+    label(svg,(sx(2)+sx(vx))/2,sy(vy)-16,'δ=−0.394',C('--emph'),'middle',700,12.5);
+  })();
+
+  // 4 — confidence: 曲率（窄 vs 寬，同深度）
+  (()=>{const svg=document.getElementById('p4'); if(!svg)return; svg.innerHTML='';
+    const {sx,sy}=frame(svg,{x0:-8,x1:8,y0v:0,y1v:0.62,px:52,py:22,pw:466,ph:246,xlab:'左右位移 s',ylab:'SAD cost',xticks:[-8,-4,0,4,8]});
+    curve(svg,fine(0,0.05,0.5,1.4,-8,8),sx,sy,C('--blue'),2.5);
+    curve(svg,fine(0,0.05,0.5,3.6,-8,8),sx,sy,C('--mag'),2.5);
+    const nar=XS8.map(s=>costW(s,0,0.05,0.5,1.4)), bro=XS8.map(s=>costW(s,0,0.05,0.5,3.6));
+    dots(svg,XS8,nar,sx,sy,C('--blue'),3.2); dots(svg,XS8,bro,sx,sy,C('--mag'),3.2);
+    label(svg,sx(-5.4),sy(costW(-5.4,0,.05,.5,1.4))-10,'窄谷 · 0.75',C('--blue'),'middle',680,12.5);
+    label(svg,sx(4.7),sy(costW(4.7,0,.05,.5,3.6))+16,'寬谷 · 0.53',C('--mag'),'middle',680,12.5);
+  })();
+
+  // 5 — basin-walk：寬單峰 vs 雙峰
+  (()=>{const svg=document.getElementById('p5a'); if(!svg)return; svg.innerHTML='';
+    const {sx,sy}=frame(svg,{x0:-8,x1:8,y0v:0,y1v:0.62,px:40,py:16,pw:344,ph:206,xlab:'左右位移 s',xticks:[-8,-4,0,4,8]});
+    band(svg,-8,8,16,206,sx,C('--blue'),0.09);
+    curve(svg,fine(0,0.05,0.5,3.2,-8,8),sx,sy,C('--blue'),2.5);
+    const ys=XS8.map(s=>costW(s,0,0.05,0.5,3.2)); dots(svg,XS8,ys,sx,sy,C('--blue'),3.2);
+    const mi=ys.indexOf(Math.min(...ys));
+    svg.appendChild(E("circle",{cx:sx(XS8[mi]),cy:sy(ys[mi]),r:6,fill:C('--blue'),stroke:C('--surface'),'stroke-width':2}));
+    label(svg,sx(0),sy(0.05)+150,'整段 basin 排除',C('--blue'),'middle',680,12);
+  })();
+  (()=>{const svg=document.getElementById('p5b'); if(!svg)return; svg.innerHTML='';
+    const xs=[-4,-3,-2,-1,0,1,2,3,4], ys=[8,1.2,8,3,1,3,8,1.3,8];
+    const {sx,sy}=frame(svg,{x0:-4,x1:4,y0v:0,y1v:9,px:40,py:16,pw:344,ph:206,xlab:'左右位移 s',xticks:[-4,-2,0,2,4]});
+    band(svg,-2,2,16,206,sx,C('--blue'),0.10);
+    curve(svg,xs.map((x,i)=>[x,ys[i]]),sx,sy,C('--blue'),2.5);
+    dots(svg,xs,ys,sx,sy,C('--blue'),3.6);
+    svg.appendChild(E("circle",{cx:sx(0),cy:sy(1),r:6,fill:C('--blue'),stroke:C('--surface'),'stroke-width':2}));
+    svg.appendChild(E("circle",{cx:sx(-3),cy:sy(1.2),r:6.5,fill:C('--emph'),stroke:C('--surface'),'stroke-width':2}));
+    label(svg,sx(-3),sy(1.2)-12,'競爭谷',C('--emph'),'middle',700,12);
+    label(svg,sx(0),sy(1)+30,'主谷 basin',C('--blue'),'middle',680,11.5);
+  })();
+
+  // 6 — 退化：邊界 + 無紋理
+  (()=>{const svg=document.getElementById('p6a'); if(!svg)return; svg.innerHTML='';
+    const {sx,sy}=frame(svg,{x0:-6,x1:6,y0v:0,y1v:0.62,px:44,py:18,pw:336,ph:210,xlab:'左右位移 s',xticks:[-6,-3,0,3,6]});
+    curve(svg,fine(-7.5,0.05,0.5,2.6),sx,sy,C('--blue'),2.5);
+    const ys=XS.map(s=>costW(s,-7.5,0.05,0.5,2.6)); dots(svg,XS,ys,sx,sy,C('--blue'),4);
+    svg.appendChild(E("circle",{cx:sx(-6),cy:sy(ys[0]),r:6.5,fill:C('--emph'),stroke:C('--surface'),'stroke-width':2}));
+    label(svg,sx(-6)+6,sy(ys[0])-12,'最小點在邊界',C('--emph'),'start',680,12);
+  })();
+  (()=>{const svg=document.getElementById('p6b'); if(!svg)return; svg.innerHTML='';
+    const {sx,sy}=frame(svg,{x0:-6,x1:6,y0v:0,y1v:0.62,px:44,py:18,pw:336,ph:210,xlab:'左右位移 s',xticks:[-6,-3,0,3,6]});
+    const ys=XS.map(s=>0.28+0.006*Math.sin(s*1.3));
+    curve(svg,XS.map(s=>[s,0.28+0.006*Math.sin(s*1.3)]),sx,sy,C('--mag'),2.5);
+    dots(svg,XS,ys,sx,sy,C('--mag'),4);
+    label(svg,sx(0),sy(0.28)+26,'無谷 → invalid',C('--mag'),'middle',680,12);
+  })();
+}
+
+const slides=[...document.querySelectorAll('.slide')];
+const N=slides.length; let cur=0;
+const dotsEl=document.getElementById('dots'), countEl=document.getElementById('count');
+const prev=document.getElementById('prev'), next=document.getElementById('next');
+slides.forEach((_,i)=>{const b=document.createElement('button');b.className='dot'+(i?'':' on');b.setAttribute('aria-label','第 '+(i+1)+' 張');b.onclick=()=>go(i);dotsEl.appendChild(b);});
+function go(i){
+  cur=Math.max(0,Math.min(N-1,i));
+  slides.forEach((s,k)=>s.classList.toggle('active',k===cur));
+  [...dotsEl.children].forEach((d,k)=>d.classList.toggle('on',k===cur));
+  countEl.textContent=(cur+1)+' / '+N;
+  prev.disabled=cur===0; next.disabled=cur===N-1;
+}
+prev.onclick=()=>go(cur-1); next.onclick=()=>go(cur+1);
+addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' '){e.preventDefault();go(cur+1);}
+  if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();go(cur-1);}
+});
+draw(); go(0);
+const mq=matchMedia('(prefers-color-scheme:dark)');
+mq.addEventListener&&mq.addEventListener('change',draw);
+new MutationObserver(draw).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+</script>

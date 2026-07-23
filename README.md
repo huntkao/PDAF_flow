@@ -29,6 +29,8 @@ flowchart LR
 
 公開介面在 `include/pdaf/`，參考實作在 `src/`。核心編為 `libpdaf`（static），CLI 與測試連結它。C++17、不依賴 OpenCV。
 
+> **圖解**：M2 深度估測的原理——sub-pixel 拋物線內插、三因子 confidence（深度 × 無歧義 × 曲率）、basin-walk 次低點檢查——有一份互動投影片：[`docs/m2_parabolic_estimator.html`](docs/m2_parabolic_estimator.html)（下載後以瀏覽器開啟）。
+
 ### 對照 Qualcomm 方案
 
 分層方式參考市面典型的 Qualcomm 相機 AF 堆疊（CamX-CHI / PDLib / HAF 的概念）。下圖左為該堆疊的簡化概念參考，右為 PDAF_flow 的對應：
