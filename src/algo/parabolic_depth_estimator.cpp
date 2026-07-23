@@ -52,8 +52,8 @@ DepthEstimate ParabolicDepthEstimator::estimate(const CostSequence& cost)
   }
   const float depth_abs = mean - cmin;
   const float unamb = (std::isinf(second) || depth_abs < 1e-9f)
-                        ? 1.f // 窗太小無可比對象，不因無法判斷而扣分
-                        : std::clamp((second - cmin) / depth_abs, 0.f, 1.f);
+                          ? 1.f // 窗太小無可比對象，不因無法判斷而扣分
+                          : std::clamp((second - cmin) / depth_abs, 0.f, 1.f);
 
   if (mi == 0 || mi + 1 == n)
   {
