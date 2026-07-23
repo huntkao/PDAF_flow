@@ -35,7 +35,7 @@ flowchart LR
 
 ![典型 Qualcomm AF 堆疊與 PDAF_flow 分層架構對比](docs/qualcomm_arch.svg)
 
-> 左側為依公開資料整理的簡化概念參考，**非官方架構圖**；名稱與分層僅為概念對應。
+> 左側為依公開資料整理的簡化概念參考，**非官方架構圖**；名稱與分層僅為概念對應。參照的公開來源（Qualcomm 官方文件、專利、社群解說）整理於 [`docs/ref/qualcomm/`](docs/ref/qualcomm/)。
 
 兩者最主要的差別在演算法庫這一層：
 
