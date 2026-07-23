@@ -129,3 +129,17 @@ TEST(AfController, RetriggerAfterFocusedResets) {
   c.trigger();
   EXPECT_EQ(c.state(), AfState::kMeasuring);
 }
+
+TEST(AfController, LensCommandUsesExposureStepNotActuatorPosition) {
+  FakeEstimator est;
+  est.queue = {{4.f, 0.9f, true}};  // valid, high-confidence, out of focus -> triggers a move
+  FakeMapper map;
+  FakeActuator act;              // act.step == 300 (default)
+  AfController c(est, map, act, tun());
+  c.trigger();
+  // Feed a measurement frame whose exposure-time lens position (250) differs
+  // from the actuator's current step (300). If the controller wrongly used the
+  // actuator position, last_base would be 300.
+  c.onFrame(AfRequest{}, frameAt(0, 250));
+  EXPECT_EQ(map.last_base, 250);  // exposure step, NOT actuator's 300
+}

@@ -73,12 +73,14 @@ TEST(ClosedLoop, NearDistanceConverges) {
   auto r = runScenario(300.0, 300, 0.01f);  // in-focus=600, d0=+6
   EXPECT_EQ(r.final_state, AfState::kFocused);
   EXPECT_LE(r.final_error_steps, 20);
+  EXPECT_LT(r.frames_used, 40);
 }
 
 TEST(ClosedLoop, FarDistanceLargeDefocusConverges) {
   auto r = runScenario(5000.0, 600, 0.01f);  // in-focus=130, d0=-9.4
   EXPECT_EQ(r.final_state, AfState::kFocused);
   EXPECT_LE(r.final_error_steps, 20);
+  EXPECT_LT(r.frames_used, 40);
 }
 
 TEST(ClosedLoop, AlreadyInFocusFinishesImmediately) {
