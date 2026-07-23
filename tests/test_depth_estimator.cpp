@@ -52,3 +52,35 @@ TEST(DepthEstimator, NoValidSamplesIsInvalid)
   EXPECT_FALSE(e.valid);
   EXPECT_EQ(e.confidence, 0.f);
 }
+
+TEST(DepthEstimator, BroadValleyPenalizedVsSharp)
+{
+  // 同一個最小值、同為單峰，但一個寬底一個窄底：曲率項讓窄谷信心較高、寬谷被折扣。
+  // 兩者深度（c_min/mean）相近，舊式只看深度會給寬谷 > 0.8；曲率折扣後應 < 0.7。
+  auto broad = ParabolicDepthEstimator{}.estimate(makeCost(-4, {9, 9, 9, 2, 1, 2, 9, 9, 9}));
+  auto sharp = ParabolicDepthEstimator{}.estimate(makeCost(-4, {9, 9, 9, 8, 1, 8, 9, 9, 9}));
+  EXPECT_TRUE(broad.valid);
+  EXPECT_GT(sharp.confidence, broad.confidence);
+  EXPECT_LT(broad.confidence, 0.7f);
+}
+
+TEST(DepthEstimator, SecondMinimumReducesConfidence)
+{
+  // 兩個勢均力敵的深谷（歧義／aliasing）→ 次低點檢查把信心壓到接近 0，
+  // 即使主谷本身又深又尖。舊式只看深度會給雙峰 > 0.7。
+  auto unimodal = ParabolicDepthEstimator{}.estimate(makeCost(-4, {8, 7, 5, 3, 1, 3, 5, 7, 8}));
+  auto bimodal = ParabolicDepthEstimator{}.estimate(makeCost(-4, {8, 1.2f, 8, 3, 1, 3, 8, 1.3f, 8}));
+  EXPECT_GT(unimodal.confidence, 0.5f);
+  EXPECT_LT(bimodal.confidence, 0.15f);
+  EXPECT_NEAR(bimodal.disparity, unimodal.disparity, 0.01f); // 主谷位置相同，差別只在歧義
+}
+
+TEST(DepthEstimator, WideUnimodalValleyNotTreatedAsAmbiguous)
+{
+  // 一個寬但單峰的谷（谷寬 > ±2 樣本，如模擬器的低頻紋理）：谷自己的坡不該被
+  // 當成第二個谷。次低點檢查必須排除主谷整段單調 basin，只計被山脊隔開的競爭谷。
+  auto e = ParabolicDepthEstimator{}.estimate(makeCost(-5, {8, 4, 1.6f, 0.8f, 0.4f, 0.2f, 0.4f, 0.8f, 1.6f, 4, 8}));
+  EXPECT_TRUE(e.valid);
+  EXPECT_NEAR(e.disparity, 0.f, 0.01f); // 對稱谷，谷底在中央
+  EXPECT_GT(e.confidence, 0.5f);        // 單峰寬谷仍應可信
+}
