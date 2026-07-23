@@ -10,10 +10,13 @@ The full design rationale is in `docs/superpowers/specs/2026-07-22-pdaf-flow-des
 
 ## Build, test, run
 
-```bash
-cmake -B build && cmake --build build            # configure + build (first time or after CMakeLists edits)
-cmake --build build                              # incremental build
-ctest --test-dir build --output-on-failure       # run the whole suite
+# The build is driven by CMakePresets.json (Ninja generator, binaryDir = build/).
+# Always use the presets — a plain `cmake -B build` can pick a different default
+# generator and collide with the preset's build/ cache (generator mismatch).
+cmake --preset default                            # configure (first time or after CMakeLists edits)
+cmake --build --preset default                    # build (incremental)
+ctest --preset default                            # run the whole suite (outputs on failure)
+#   presets: default (Debug) · release (Release). Requires cmake >= 3.21 + ninja.
 
 # run a single test suite or case (single test binary, GoogleTest filter):
 ./build/tests/pdaf_tests --gtest_filter='ClosedLoop.*'
