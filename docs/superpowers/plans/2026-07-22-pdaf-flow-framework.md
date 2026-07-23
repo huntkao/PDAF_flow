@@ -1859,9 +1859,11 @@ void SimWorld::moveTo(int step) {
 LensStatus SimWorld::lensStatus() const { return {current_step_, settle_counter_ > 0}; }
 
 float SimWorld::texture(float x) const {
-  return 2.f + 0.8f * std::sin(0.37f * x + phase_[0]) +
-         0.5f * std::sin(1.13f * x + phase_[1]) +
-         0.3f * std::sin(2.71f * x + phase_[2]);
+  // 頻率皆低於 π/16 (~0.196 rad/sample)，確保 SAD cost 在 ±16 shift 搜尋窗內單峰、
+  // 不與搜尋窗產生 aliasing（高頻紋理的週期若 ≈ 搜尋窗寬會出現假極小值）
+  return 2.f + 0.7f * std::sin(0.07f * x + phase_[0]) +
+         0.6f * std::sin(0.13f * x + phase_[1]) +
+         0.4f * std::sin(0.19f * x + phase_[2]);
 }
 
 float SimWorld::blurredTexture(float x, int radius) const {
