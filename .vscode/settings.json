@@ -1,0 +1,11 @@
+{
+  // 使用 CMakePresets.json（Ninja），與 CLI 共用同一個 generator，避免 build/ 衝突
+  "cmake.useCMakePresets": "always",
+
+  // 除錯/執行 pdaf_cli 時的設定：
+  //   cwd 必須是專案根，因為 pdaf_cli 用相對路徑讀 config/ 與寫 out/
+  "cmake.debugConfig": {
+    "cwd": "${workspaceFolder}",
+    "args": ["--config", "config/default.json", "--out", "out"]
+  }
+}
