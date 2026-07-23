@@ -51,6 +51,10 @@ ctest --test-dir build --output-on-failure          # 全部測試
 | `near.json` | 300mm | 300 | +6.0 | 600 | 0 step |
 | `far.json` | 5000mm | 600 | −9.4（大離焦） | 130 | 3 step |
 
+![三種物距的 VCM step 收斂軌跡](docs/convergence.svg)
+
+三條線各自從起始位置收斂到自己的合焦目標（虛線）：近距往前推、遠距往後拉，前三個 frame 量測＋移動/settle，第 4 frame 複查後合焦。互動版（hover tooltip、逐 frame 表格、light/dark 主題）在 [`docs/convergence.html`](docs/convergence.html)——下載後以瀏覽器開啟。
+
 disparity 的正負號直接指出鏡頭該往哪走（近距往前、遠距往後）；遠距大離焦的殘留誤差來自單一 DCC 增益對大離焦的線性外插，仍在合焦門檻內，可用多錨點 DCC 表消除。
 
 `--mode replay` 可改讀 `system.replay_dir` 下的 frame dump（`frame_0000.json` 起連號），用於單模組驗證與實機資料離線分析。

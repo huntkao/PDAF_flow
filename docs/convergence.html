@@ -1,0 +1,346 @@
+<title>PDAF 對焦收斂軌跡</title>
+<style>
+  :root {
+    color-scheme: light;
+    --plane:        #f4f4f0;
+    --surface:      #fcfcfb;
+    --ink:          #0b0b0b;
+    --ink-2:        #52514e;
+    --muted:        #898781;
+    --grid:         #e6e5df;
+    --axis:         #c3c2b7;
+    --border:       rgba(11,11,11,0.10);
+    --s1:           #2a78d6;  /* 中距 */
+    --s2:           #008300;  /* 近距 */
+    --s3:           #d1497f;  /* 遠距 */
+    --good:         #006300;
+    --shadow:       0 1px 2px rgba(11,11,11,.05), 0 8px 24px rgba(11,11,11,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --plane:      #0d0d0d;
+      --surface:    #1a1a19;
+      --ink:        #ffffff;
+      --ink-2:      #c3c2b7;
+      --muted:      #898781;
+      --grid:       #2c2c2a;
+      --axis:       #383835;
+      --border:     rgba(255,255,255,0.10);
+      --s1:         #3987e5;
+      --s2:         #16a616;
+      --s3:         #d55181;
+      --good:       #0ca30c;
+      --shadow:     0 1px 2px rgba(0,0,0,.3), 0 8px 28px rgba(0,0,0,.45);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --plane:#0d0d0d; --surface:#1a1a19; --ink:#fff; --ink-2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+    --s1:#3987e5; --s2:#16a616; --s3:#d55181; --good:#0ca30c;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 28px rgba(0,0,0,.45);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--plane);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 24px 64px; }
+
+  header { margin-bottom: 28px; }
+  .eyebrow {
+    font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--muted); font-weight: 600; margin: 0 0 8px;
+  }
+  h1 {
+    font-size: clamp(24px, 3.4vw, 34px); line-height: 1.15; margin: 0 0 10px;
+    font-weight: 680; letter-spacing: -0.01em; text-wrap: balance;
+  }
+  .lede { margin: 0; color: var(--ink-2); max-width: 62ch; font-size: 15.5px; }
+  .lede code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px;
+    background: color-mix(in oklab, var(--s1) 12%, transparent);
+    padding: 1px 5px; border-radius: 4px;
+  }
+
+  .panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; box-shadow: var(--shadow); padding: 22px 22px 8px;
+    margin-bottom: 22px;
+  }
+  .panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+  .panel-title { font-size: 15px; font-weight: 640; margin: 0; }
+  .panel-sub { font-size: 12.5px; color: var(--muted); margin: 0; }
+
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; margin: 10px 2px 6px; }
+  .legend-item { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--ink-2); }
+  .swatch { width: 22px; height: 3px; border-radius: 2px; flex: none; }
+  .legend-item b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  figure { margin: 0; }
+  .chart-scroll { overflow-x: auto; }
+  svg { display: block; width: 100%; min-width: 560px; height: auto; }
+  svg text { font-family: system-ui, sans-serif; }
+  .tick { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .axis-title { fill: var(--muted); font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
+  .phase-label { fill: var(--muted); font-size: 10.5px; }
+  .series-label { font-size: 12px; font-weight: 640; }
+  .target-label { font-size: 10px; font-variant-numeric: tabular-nums; }
+
+  .dot { cursor: pointer; }
+  .crosshair { stroke: var(--axis); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0; pointer-events: none; }
+  .hit { fill: transparent; cursor: crosshair; }
+
+  .tip {
+    position: fixed; z-index: 10; pointer-events: none; opacity: 0;
+    transform: translate(-50%, calc(-100% - 12px)); transition: opacity .1s;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 9px; box-shadow: var(--shadow); padding: 9px 11px;
+    font-size: 12.5px; min-width: 170px;
+  }
+  .tip-h { font-weight: 640; margin-bottom: 6px; font-size: 12px; }
+  .tip-row { display: flex; align-items: center; gap: 8px; margin: 3px 0; white-space: nowrap; }
+  .tip-row .sw { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+  .tip-row .nm { color: var(--ink-2); flex: 1; }
+  .tip-row .vl { font-variant-numeric: tabular-nums; font-weight: 600; }
+
+  .notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: 4px; }
+  .note { font-size: 13px; color: var(--ink-2); }
+  .note h3 { font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: 0 0 4px; font-weight: 600; }
+  .note b { color: var(--ink); font-weight: 600; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+  caption { text-align: left; font-size: 12.5px; color: var(--muted); padding: 0 0 10px; }
+  th, td { text-align: right; padding: 7px 10px; border-bottom: 1px solid var(--grid); }
+  th:first-child, td:first-child { text-align: left; }
+  thead th { color: var(--muted); font-weight: 600; font-size: 11.5px; letter-spacing: .03em; text-transform: uppercase; border-bottom: 1px solid var(--axis); }
+  tbody tr:last-child td { border-bottom: none; }
+  .state { color: var(--ink-2); font-variant-numeric: normal; }
+  .foc { color: var(--good); font-weight: 600; }
+  .err0 { color: var(--good); font-weight: 600; }
+
+  footer { margin-top: 28px; font-size: 12.5px; color: var(--muted); }
+  footer code { font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">PDAF_flow · 閉環模擬</p>
+    <h1>單次自動對焦：三種物距的收斂軌跡</h1>
+    <p class="lede">同一套 pipeline（M1 相位匹配 → M2 disparity/confidence → M3 DCC→VCM step）在三個場景各跑一次 <code>pdaf_cli</code>。每條線是鏡頭 VCM step 隨 sensor frame 的變化，收斂到各自的合焦位置（虛線）。</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <p class="panel-title">VCM step 收斂</p>
+        <p class="panel-sub">量測 → 移動 → settle → 複查 → 合焦，全程 5 個 frame</p>
+      </div>
+    </div>
+    <div class="legend" id="legend"></div>
+    <figure>
+      <div class="chart-scroll">
+        <svg id="chart" viewBox="0 0 820 400" role="img" aria-label="三種物距下 VCM step 隨 frame 收斂的折線圖"></svg>
+      </div>
+    </figure>
+    <div class="notes">
+      <div class="note">
+        <h3>對焦方向</h3>
+        近距 disparity <b>正</b>（+6.0，鏡頭往前 300→600）、遠距 <b>負</b>（−9.3，往後 600→130）。符號直接指出鏡頭該往哪走。
+      </div>
+      <div class="note">
+        <h3>量測精度</h3>
+        初始量測對上真值誤差 &lt; 0.07 disparity、confidence <b>0.93–0.98</b>，即使遠距 −9.3 已近 ±16 搜尋窗邊緣。
+      </div>
+      <div class="note">
+        <h3>殘留誤差</h3>
+        遠距落在 133（真值 130，<b>3 step</b>）：單一 DCC 增益對大離焦線性外插的偏差，仍在合焦門檻內。多錨點 DCC 表可消除。
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <p class="panel-title">逐 frame 紀錄</p>
+        <p class="panel-sub">來自 frames.csv — 移動/settle 期間不量測（disparity 空白），避免量到晃動中的資料</p>
+      </div>
+    </div>
+    <div class="chart-scroll">
+      <table id="tbl">
+        <caption>三場景並列；step 為該 frame 起始的鏡頭位置，gt 為模擬器 ground truth</caption>
+      </table>
+    </div>
+  </div>
+
+  <footer>
+    模擬器與 M3 共用同一 <code>dccInterp</code>，故閉環自洽。切換 <code>--mode replay</code> 可改吃真機 dump 資料離線分析。
+  </footer>
+</div>
+
+<div class="tip" id="tip"></div>
+
+<script>
+const NF = 5;                 // frames per run
+const scenarios = [
+  { key:'mid',  name:'中距', dist:2000, cvar:'--s1', start:300, target:175,
+    step:[300,300,300,175,175],
+    disp:[-2.497,null,null,null,-0.0138],
+    conf:[0.928,null,null,null,0.982],
+    gt:[-2.5,-2.5,-2.5,0,0],
+    state:['MEASURING→MOVING','MOVING→SETTLING','SETTLING','SETTLING→VERIFYING','VERIFYING→FOCUSED'] },
+  { key:'near', name:'近距', dist:300,  cvar:'--s2', start:300, target:600,
+    step:[300,300,300,600,600],
+    disp:[6.004,null,null,null,-0.0138],
+    conf:[0.981,null,null,null,0.982],
+    gt:[6.0,6.0,6.0,0,0],
+    state:['MEASURING→MOVING','MOVING→SETTLING','SETTLING','SETTLING→VERIFYING','VERIFYING→FOCUSED'] },
+  { key:'far',  name:'遠距', dist:5000, cvar:'--s3', start:600, target:130,
+    step:[600,600,600,133,133],
+    disp:[-9.335,null,null,null,-0.048],
+    conf:[0.956,null,null,null,0.978],
+    gt:[-9.4,-9.4,-9.4,-0.06,-0.06],
+    state:['MEASURING→MOVING','MOVING→SETTLING','SETTLING','SETTLING→VERIFYING','VERIFYING→FOCUSED'] },
+];
+const col = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+/* ---- chart geometry ---- */
+const W=820, H=400, m={t:26,r:96,b:56,l:52};
+const iw=W-m.l-m.r, ih=H-m.t-m.b;
+const yMin=100, yMax=650;
+const xOf = f => m.l + (f/(NF-1))*iw;
+const yOf = s => m.t + (1-(s-yMin)/(yMax-yMin))*ih;
+const SVGNS='http://www.w3.org/2000/svg';
+const el=(n,a={})=>{const e=document.createElementNS(SVGNS,n);for(const k in a)e.setAttribute(k,a[k]);return e;};
+
+function draw(){
+  const svg=document.getElementById('chart');
+  svg.innerHTML='';
+
+  // y gridlines + labels
+  for(let s=100;s<=650;s+=100){
+    const y=yOf(s);
+    svg.appendChild(el('line',{x1:m.l,y1:y,x2:m.l+iw,y2:y,stroke:col('--grid'),'stroke-width':1}));
+    const t=el('text',{x:m.l-10,y:y+4,'text-anchor':'end',class:'tick'});t.textContent=s;svg.appendChild(t);
+  }
+  const yt=el('text',{x:m.l-38,y:m.t-10,class:'axis-title'});yt.textContent='VCM step';svg.appendChild(yt);
+
+  // phase bands under x-axis: frame0 measure, 1-2 move/settle, 3 arrive, 4 verify
+  const phases=[['量測',0,0],['移動 / settle',1,2],['複查 → 合焦',3,4]];
+  phases.forEach(([lab,a,b])=>{
+    const cx=(xOf(a)+xOf(b))/2;
+    const t=el('text',{x:cx,y:H-16,'text-anchor':'middle',class:'phase-label'});t.textContent=lab;svg.appendChild(t);
+  });
+  // x ticks (frame)
+  for(let f=0;f<NF;f++){
+    const t=el('text',{x:xOf(f),y:H-38,'text-anchor':'middle',class:'tick'});t.textContent=f;svg.appendChild(t);
+  }
+  const xt=el('text',{x:m.l+iw/2,y:H-2,'text-anchor':'middle',class:'axis-title'});xt.textContent='sensor frame';svg.appendChild(xt);
+
+  // baseline
+  svg.appendChild(el('line',{x1:m.l,y1:m.t+ih,x2:m.l+iw,y2:m.t+ih,stroke:col('--axis'),'stroke-width':1}));
+
+  // target dashed lines + trajectories
+  scenarios.forEach(sc=>{
+    const c=col(sc.cvar);
+    // target line
+    svg.appendChild(el('line',{x1:m.l,y1:yOf(sc.target),x2:m.l+iw,y2:yOf(sc.target),
+      stroke:c,'stroke-width':1,'stroke-dasharray':'2 4',opacity:.45}));
+    const tl=el('text',{x:m.l+iw+8,y:yOf(sc.target)+4,class:'target-label',fill:c,opacity:.9});
+    tl.textContent='→ '+sc.target;svg.appendChild(tl);
+  });
+  scenarios.forEach(sc=>{
+    const c=col(sc.cvar);
+    let d='';
+    sc.step.forEach((s,f)=>{ d+=(f?'L':'M')+xOf(f)+' '+yOf(s); });
+    svg.appendChild(el('path',{d,fill:'none',stroke:c,'stroke-width':2.5,'stroke-linejoin':'round','stroke-linecap':'round'}));
+    // markers
+    sc.step.forEach((s,f)=>{
+      const emph = (f===0 || f===NF-1);
+      svg.appendChild(el('circle',{cx:xOf(f),cy:yOf(s),r:emph?4.5:3,fill:emph?c:col('--surface'),
+        stroke:c,'stroke-width':2,class:'dot'}));
+    });
+    // direct label at end
+    const ly=yOf(sc.step[NF-1]);
+    const lab=el('text',{x:m.l+iw+8,y:ly-8,class:'series-label',fill:c});
+    lab.textContent=sc.name;svg.appendChild(lab);
+  });
+
+  // crosshair + hit zones
+  const cross=el('line',{class:'crosshair',y1:m.t,y2:m.t+ih});svg.appendChild(cross);
+  for(let f=0;f<NF;f++){
+    const half=iw/(NF-1)/2;
+    const hit=el('rect',{class:'hit',x:xOf(f)-half,y:m.t,width:half*2,height:ih});
+    hit.addEventListener('mousemove',e=>showTip(e,f,cross));
+    hit.addEventListener('mouseleave',()=>{cross.style.opacity=0;document.getElementById('tip').style.opacity=0;});
+    svg.appendChild(hit);
+  }
+  buildLegend();
+}
+
+function showTip(e,f,cross){
+  cross.setAttribute('x1',xOf(f));cross.setAttribute('x2',xOf(f));cross.style.opacity=1;
+  const tip=document.getElementById('tip');
+  let html=`<div class="tip-h">Frame ${f}</div>`;
+  scenarios.forEach(sc=>{
+    const c=col(sc.cvar);
+    const dsp = sc.disp[f]==null ? '—' : sc.disp[f].toFixed(3);
+    html+=`<div class="tip-row"><span class="sw" style="background:${c}"></span>`+
+          `<span class="nm">${sc.name} · step ${sc.step[f]}</span>`+
+          `<span class="vl">${dsp}</span></div>`;
+  });
+  tip.innerHTML=html;
+  tip.style.left=e.clientX+'px';tip.style.top=e.clientY+'px';tip.style.opacity=1;
+}
+
+function buildLegend(){
+  const L=document.getElementById('legend');L.innerHTML='';
+  scenarios.forEach(sc=>{
+    const c=col(sc.cvar);
+    const d=document.createElement('div');d.className='legend-item';
+    d.innerHTML=`<span class="swatch" style="background:${c}"></span>`+
+      `${sc.name}物距 <b>${sc.dist}mm</b> · 合焦 <b>${sc.target}</b>`;
+    L.appendChild(d);
+  });
+}
+
+/* ---- table ---- */
+function buildTable(){
+  const t=document.getElementById('tbl');
+  let h='<thead><tr><th>Frame</th>';
+  scenarios.forEach(sc=>{ h+=`<th colspan="2">${sc.name} ${sc.dist}mm</th>`; });
+  h+='</tr><tr><th>狀態轉移</th>';
+  scenarios.forEach(()=>{ h+='<th>step</th><th>disparity</th>'; });
+  h+='</tr></thead><tbody>';
+  for(let f=0;f<NF;f++){
+    // use the mid scenario's state text as the shared row label (identical across runs)
+    h+=`<tr><td class="state">${scenarios[0].state[f]}</td>`;
+    scenarios.forEach(sc=>{
+      const foc = sc.state[f].endsWith('FOCUSED');
+      const dsp = sc.disp[f]==null ? '·' : sc.disp[f].toFixed(3);
+      h+=`<td${foc?' class="foc"':''}>${sc.step[f]}</td><td>${dsp}</td>`;
+    });
+    h+='</tr>';
+  }
+  h+='</tbody>';
+  // summary footer row
+  h+='<tfoot><tr><td class="state"><b>最終誤差 (step)</b></td>';
+  scenarios.forEach(sc=>{
+    const err=Math.abs(sc.step[NF-1]-sc.target);
+    h+=`<td colspan="2" class="${err===0?'err0':''}">${err===0?'0 ✓':err}</td>`;
+  });
+  h+='</tr></tfoot>';
+  t.innerHTML=h;
+}
+
+draw(); buildTable();
+const mq=window.matchMedia('(prefers-color-scheme: dark)');
+mq.addEventListener&&mq.addEventListener('change',draw);
+new MutationObserver(draw).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+</script>

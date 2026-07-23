@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 400" font-family="system-ui,Segoe UI,sans-serif" role="img" aria-label="三種物距 VCM step 收斂軌跡">
+<rect x="0.5" y="0.5" width="819" height="399" rx="14" fill="#fcfcfb" stroke="#dcdbd4"/>
+<text x="52" y="20" font-size="13" font-weight="640" fill="#0b0b0b">VCM step 收斂 · 單次自動對焦（5 frame）</text>
+<line x1="52" y1="344.0" x2="710" y2="344.0" stroke="#e6e5df"/>
+<text x="42" y="348.0" text-anchor="end" font-size="11" fill="#7a7873">100</text>
+<line x1="52" y1="286.2" x2="710" y2="286.2" stroke="#e6e5df"/>
+<text x="42" y="290.2" text-anchor="end" font-size="11" fill="#7a7873">200</text>
+<line x1="52" y1="228.4" x2="710" y2="228.4" stroke="#e6e5df"/>
+<text x="42" y="232.4" text-anchor="end" font-size="11" fill="#7a7873">300</text>
+<line x1="52" y1="170.5" x2="710" y2="170.5" stroke="#e6e5df"/>
+<text x="42" y="174.5" text-anchor="end" font-size="11" fill="#7a7873">400</text>
+<line x1="52" y1="112.7" x2="710" y2="112.7" stroke="#e6e5df"/>
+<text x="42" y="116.7" text-anchor="end" font-size="11" fill="#7a7873">500</text>
+<line x1="52" y1="54.9" x2="710" y2="54.9" stroke="#e6e5df"/>
+<text x="42" y="58.9" text-anchor="end" font-size="11" fill="#7a7873">600</text>
+<text x="12" y="14" font-size="11" fill="#7a7873" letter-spacing=".04em">VCM step</text>
+<text x="52.0" y="384" text-anchor="middle" font-size="10.5" fill="#7a7873">量測</text>
+<text x="298.8" y="384" text-anchor="middle" font-size="10.5" fill="#7a7873">移動 / settle</text>
+<text x="627.8" y="384" text-anchor="middle" font-size="10.5" fill="#7a7873">複查 → 合焦</text>
+<text x="52.0" y="362" text-anchor="middle" font-size="11" fill="#7a7873">0</text>
+<text x="216.5" y="362" text-anchor="middle" font-size="11" fill="#7a7873">1</text>
+<text x="381.0" y="362" text-anchor="middle" font-size="11" fill="#7a7873">2</text>
+<text x="545.5" y="362" text-anchor="middle" font-size="11" fill="#7a7873">3</text>
+<text x="710.0" y="362" text-anchor="middle" font-size="11" fill="#7a7873">4</text>
+<text x="381.0" y="398" text-anchor="middle" font-size="11" fill="#7a7873" letter-spacing=".04em">sensor frame</text>
+<line x1="52" y1="344.0" x2="710" y2="344.0" stroke="#c3c2b7"/>
+<line x1="52" y1="300.6" x2="710" y2="300.6" stroke="#2a78d6" stroke-dasharray="2 4" opacity="0.45"/>
+<text x="718" y="304.6" font-size="10" fill="#2a78d6" opacity="0.9">→ 175</text>
+<line x1="52" y1="54.9" x2="710" y2="54.9" stroke="#008300" stroke-dasharray="2 4" opacity="0.45"/>
+<text x="718" y="58.9" font-size="10" fill="#008300" opacity="0.9">→ 600</text>
+<line x1="52" y1="326.7" x2="710" y2="326.7" stroke="#d1497f" stroke-dasharray="2 4" opacity="0.45"/>
+<text x="718" y="330.7" font-size="10" fill="#d1497f" opacity="0.9">→ 130</text>
+<path d="M52.0 228.4 L216.5 228.4 L381.0 228.4 L545.5 300.6 L710.0 300.6 " fill="none" stroke="#2a78d6" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="52.0" cy="228.4" r="4.5" fill="#2a78d6" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="216.5" cy="228.4" r="3" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="381.0" cy="228.4" r="3" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="545.5" cy="300.6" r="3" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="710.0" cy="300.6" r="4.5" fill="#2a78d6" stroke="#2a78d6" stroke-width="2"/>
+<text x="718" y="292.6" font-size="12" font-weight="640" fill="#2a78d6">中距 2000mm</text>
+<path d="M52.0 228.4 L216.5 228.4 L381.0 228.4 L545.5 54.9 L710.0 54.9 " fill="none" stroke="#008300" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="52.0" cy="228.4" r="4.5" fill="#008300" stroke="#008300" stroke-width="2"/>
+<circle cx="216.5" cy="228.4" r="3" fill="#fcfcfb" stroke="#008300" stroke-width="2"/>
+<circle cx="381.0" cy="228.4" r="3" fill="#fcfcfb" stroke="#008300" stroke-width="2"/>
+<circle cx="545.5" cy="54.9" r="3" fill="#fcfcfb" stroke="#008300" stroke-width="2"/>
+<circle cx="710.0" cy="54.9" r="4.5" fill="#008300" stroke="#008300" stroke-width="2"/>
+<text x="718" y="46.9" font-size="12" font-weight="640" fill="#008300">近距 300mm</text>
+<path d="M52.0 54.9 L216.5 54.9 L381.0 54.9 L545.5 324.9 L710.0 324.9 " fill="none" stroke="#d1497f" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="52.0" cy="54.9" r="4.5" fill="#d1497f" stroke="#d1497f" stroke-width="2"/>
+<circle cx="216.5" cy="54.9" r="3" fill="#fcfcfb" stroke="#d1497f" stroke-width="2"/>
+<circle cx="381.0" cy="54.9" r="3" fill="#fcfcfb" stroke="#d1497f" stroke-width="2"/>
+<circle cx="545.5" cy="324.9" r="3" fill="#fcfcfb" stroke="#d1497f" stroke-width="2"/>
+<circle cx="710.0" cy="324.9" r="4.5" fill="#d1497f" stroke="#d1497f" stroke-width="2"/>
+<text x="718" y="316.9" font-size="12" font-weight="640" fill="#d1497f">遠距 5000mm</text>
+</svg>
