@@ -29,7 +29,7 @@ ctest --preset default                            # run the whole suite (outputs
 #   outputs: <out>/frames.csv (per-frame state/disparity/confidence/lens_step) + <out>/summary.txt
 ```
 
-There is no separate linter. All tests compile into one binary, `pdaf_tests` — new test files are added to the `add_executable(pdaf_tests ...)` list in `tests/CMakeLists.txt`, not as new targets. GoogleTest (v1.14.0) is fetched via FetchContent; nlohmann/json (v3.11.3) is vendored at `third_party/nlohmann/json.hpp`. No OpenCV — all image math is hand-written in the simulator.
+Code style is `.clang-format` (Allman braces, 2-space indent, `ColumnLimit: 0`, `InsertBraces: true`); match it in any edit. A committed pre-commit hook (`.githooks/pre-commit`) blocks commits with unformatted C/C++ — enable it once per clone with `git config core.hooksPath .githooks`. Run `clang-format -i <file>` to fix violations. There is no other linter. All tests compile into one binary, `pdaf_tests` — new test files are added to the `add_executable(pdaf_tests ...)` list in `tests/CMakeLists.txt`, not as new targets. GoogleTest (v1.14.0) is fetched via FetchContent; nlohmann/json (v3.11.3) is vendored at `third_party/nlohmann/json.hpp`. No OpenCV — all image math is hand-written in the simulator.
 
 ## Architecture: four layers
 

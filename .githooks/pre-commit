@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# 檢查 staged 的 C/C++ 檔是否符合 .clang-format；不符合就擋下 commit。
+# 啟用：git config core.hooksPath .githooks（clone 後執行一次）
+set -uo pipefail
+
+if ! command -v clang-format >/dev/null 2>&1; then
+  echo "pre-commit: clang-format 未安裝，略過格式檢查" >&2
+  exit 0
+fi
+
+# staged 的原始碼（新增/複製/修改），排除 vendored 的 third_party/
+files=$(git diff --cached --name-only --diff-filter=ACM \
+          | grep -E '\.(cpp|cc|cxx|h|hpp)$' \
+          | grep -v '^third_party/' || true)
+[ -z "$files" ] && exit 0
+
+fail=0
+while IFS= read -r f; do
+  [ -f "$f" ] || continue
+  if ! clang-format --dry-run --Werror "$f" >/dev/null 2>&1; then
+    if [ "$fail" -eq 0 ]; then
+      echo "pre-commit: 下列檔案不符合 .clang-format" >&2
+    fi
+    echo "  ✗ $f" >&2
+    fail=1
+  fi
+done <<< "$files"
+
+if [ "$fail" -ne 0 ]; then
+  echo "" >&2
+  echo "修正後重新 commit：" >&2
+  echo "    clang-format -i <檔案>" >&2
+  exit 1
+fi
+exit 0
