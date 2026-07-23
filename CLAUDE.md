@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 PDAF_flow is a C++17 demo framework for phase-detection autofocus (PDAF) flow development. It is designed from a real hardware-application viewpoint: it owns the whole AF system's configuration and wires three algorithm modules into a closed loop that drives a lens to focus. There is no real sensor/VCM — an optical simulator closes the loop for demo and testing, and a replay source feeds recorded dumps for offline analysis.
 
-The full design rationale is in `docs/superpowers/specs/2026-07-22-pdaf-flow-design.md`; the task-by-task build plan (with the exact reference code for every module) is in `docs/superpowers/plans/2026-07-22-pdaf-flow-framework.md`. Read the spec before making architectural changes.
+The full design rationale is in `docs/superpowers/specs/2026-07-22-pdaf-flow-design.md`; the task-by-task build plan (with the exact reference code for every module) is in `docs/superpowers/plans/2026-07-22-pdaf-flow-framework.md`. Read the spec before making architectural changes. The Qualcomm AF stack this layering is modeled on, and the verified public sources for it, are documented in `docs/ref/qualcomm/README.md` (the comparison diagram is a conceptual synthesis, not an official Qualcomm document — the patents there are the substantive sources).
 
 ## Build, test, run
 
