@@ -4,19 +4,28 @@
 #include <cmath>
 #include <numeric>
 
-namespace pdaf {
+namespace pdaf
+{
 
-DepthEstimate ParabolicDepthEstimator::estimate(const CostSequence& cost) {
+DepthEstimate ParabolicDepthEstimator::estimate(const CostSequence& cost)
+{
   DepthEstimate e;
   const auto& v = cost.costs;
-  if (v.size() < 3 || cost.valid_samples <= 0) return e;
+  if (v.size() < 3 || cost.valid_samples <= 0)
+  {
+    return e;
+  }
 
   const size_t mi = std::min_element(v.begin(), v.end()) - v.begin();
   const float mean = std::accumulate(v.begin(), v.end(), 0.f) / v.size();
-  if (mean < 1e-6f) return e;  // 全平：無紋理可匹配
+  if (mean < 1e-6f)
+  {
+    return e; // 全平：無紋理可匹配
+  }
 
   const float conf = std::clamp(1.f - v[mi] / mean, 0.f, 1.f);
-  if (mi == 0 || mi + 1 == v.size()) {
+  if (mi == 0 || mi + 1 == v.size())
+  {
     // 極小值在搜尋邊界：真值可能在範圍外，不內插且信心減半
     e = {static_cast<float>(cost.shift_min + static_cast<int>(mi)), conf * 0.5f, true};
     return e;
@@ -28,4 +37,4 @@ DepthEstimate ParabolicDepthEstimator::estimate(const CostSequence& cost) {
   return e;
 }
 
-}  // namespace pdaf
+} // namespace pdaf

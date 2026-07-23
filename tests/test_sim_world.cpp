@@ -8,16 +8,19 @@
 
 using namespace pdaf;
 
-namespace {
+namespace
+{
 
-SensorConfig sensorCfg() {
+SensorConfig sensorCfg()
+{
   SensorConfig s;
   s.roi_sample_width = 64;
   s.roi_sample_height = 4;
   return s;
 }
 
-SimConfig simCfg(double dist_mm, int init_step) {
+SimConfig simCfg(double dist_mm, int init_step)
+{
   SimConfig c;
   c.object_distance_mm = dist_mm;
   c.initial_step = init_step;
@@ -25,21 +28,26 @@ SimConfig simCfg(double dist_mm, int init_step) {
   c.gain_mismatch = 1.1f;
   c.settle_frames = 3;
   c.seed = 42;
-  return c;  // step_inf=100, focus_gain=150000（預設）
+  return c; // step_inf=100, focus_gain=150000（預設）
 }
 
-DccTable dcc() { return DccTable{0, 1023, {{0, 50.f}, {1023, 50.f}}}; }
+DccTable dcc()
+{
+  return DccTable{0, 1023, {{0, 50.f}, {1023, 50.f}}};
+}
 
-}  // namespace
+} // namespace
 
-TEST(SimWorld, InFocusStepFromDistance) {
+TEST(SimWorld, InFocusStepFromDistance)
+{
   SimWorld w(sensorCfg(), simCfg(2000.0, 300), dcc());
-  EXPECT_EQ(w.inFocusStep(), 175);  // 100 + 150000/2000
+  EXPECT_EQ(w.inFocusStep(), 175); // 100 + 150000/2000
   EXPECT_EQ(w.currentStep(), 300);
   EXPECT_NEAR(w.groundTruthDisparity(), (175 - 300) / 50.f, 0.01f);
 }
 
-TEST(SimWorld, ActuatorSettlesAfterConfiguredFrames) {
+TEST(SimWorld, ActuatorSettlesAfterConfiguredFrames)
+{
   SimWorld w(sensorCfg(), simCfg(2000.0, 300), dcc());
   w.moveTo(500);
   AfRequest req{{Roi{0, 0, 64, 4}}};
@@ -47,12 +55,13 @@ TEST(SimWorld, ActuatorSettlesAfterConfiguredFrames) {
   w.capture(req);
   w.capture(req);
   EXPECT_TRUE(w.lensStatus().moving);
-  w.capture(req);  // 第 settle_frames 次 → 到位
+  w.capture(req); // 第 settle_frames 次 → 到位
   EXPECT_FALSE(w.lensStatus().moving);
   EXPECT_EQ(w.currentStep(), 500);
 }
 
-TEST(SimWorld, CaptureMetaCarriesFrameIdAndExposureStep) {
+TEST(SimWorld, CaptureMetaCarriesFrameIdAndExposureStep)
+{
   SimWorld w(sensorCfg(), simCfg(2000.0, 300), dcc());
   AfRequest req{{Roi{0, 0, 64, 4}}};
   auto a = w.capture(req);
@@ -64,14 +73,15 @@ TEST(SimWorld, CaptureMetaCarriesFrameIdAndExposureStep) {
   EXPECT_EQ(a.raw->rois[0].width, 64);
 }
 
-TEST(SimWorld, PipelineMeasuresGroundTruthDisparity) {
+TEST(SimWorld, PipelineMeasuresGroundTruthDisparity)
+{
   // 模擬器資料丟進 M1+M2，量到的 disparity 應接近真值
-  SimWorld w(sensorCfg(), simCfg(2000.0, 300), dcc());  // d_gt = -2.5
+  SimWorld w(sensorCfg(), simCfg(2000.0, 300), dcc()); // d_gt = -2.5
   AfRequest req{{Roi{0, 0, 64, 4}}};
   auto in = w.capture(req);
 
   SadCostEngine m1;
-  m1.init(LrcCalib{1.f, 1.f / 1.1f}, PdPatternDesc{}, -16, 16);  // 校正抵銷 gain_mismatch
+  m1.init(LrcCalib{1.f, 1.f / 1.1f}, PdPatternDesc{}, -16, 16); // 校正抵銷 gain_mismatch
   auto costs = m1.compute(*in.raw);
   auto e = ParabolicDepthEstimator{}.estimate(costs[0]);
   EXPECT_TRUE(e.valid);

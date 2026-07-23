@@ -53,5 +53,6 @@ These are load-bearing and span multiple files — the reason a change can pass 
 
 ## Convention notes
 
+- **Code style is Allman with mandatory braces**, enforced by `.clang-format` (based on LLVM, 2-space indent, `ColumnLimit: 0`). Every `{` goes on its own line, and single-statement `if`/`for`/etc. get explicit braces with the body on a separate line (`InsertBraces: true`). Pointer/reference `&`/`*` stick to the type (`const T& x`). Run `clang-format -i` on any file you touch (the pip-installed binary lives at `~/.local/bin/clang-format`); don't hand-format against this.
 - The closed-loop integration test (`tests/test_closed_loop.cpp`) is the framework's living spec: it runs the real simulator + real M1/M2/M3 end-to-end and asserts convergence to FOCUSED within tolerance across mid/near/far scenarios. If a change makes it fail, that is a real integration regression — do not loosen the assertions to make it pass.
 - `PdInput` carries either raw `PdFrame` samples or pre-computed `hw_costs` (ISP hardware path); `PdafPipeline` runs M1 only on the raw path. `IFocusEstimator`'s seam is real for alternative PD estimators, but a genuinely different modality (contrast/ToF) would need `PdInput` extended with a new data arm.

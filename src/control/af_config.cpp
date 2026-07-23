@@ -6,40 +6,54 @@
 #include <sstream>
 #include <stdexcept>
 
-namespace pdaf {
-namespace {
+namespace pdaf
+{
+namespace
+{
 
 using nlohmann::json;
 
 // Helper to compose field path: avoid leading dot for top-level fields
-auto composePath = [](const std::string& path, const std::string& key) -> std::string {
+auto composePath = [](const std::string& path, const std::string& key) -> std::string
+{
   return path.empty() ? key : path + "." + key;
 };
 
 // fail-fast：缺欄位即丟出含完整路徑的錯誤
-const json& req(const json& j, const std::string& key, const std::string& path) {
+const json& req(const json& j, const std::string& key, const std::string& path)
+{
   auto it = j.find(key);
   if (it == j.end())
+  {
     throw std::runtime_error("config: missing field '" + composePath(path, key) + "'");
+  }
   return *it;
 }
 
 template <typename T>
-T reqAs(const json& j, const std::string& key, const std::string& path) {
-  try {
+T reqAs(const json& j, const std::string& key, const std::string& path)
+{
+  try
+  {
     return req(j, key, path).get<T>();
-  } catch (const json::exception&) {
+  }
+  catch (const json::exception&)
+  {
     throw std::runtime_error("config: bad type for '" + composePath(path, key) + "'");
   }
 }
 
-}  // namespace
+} // namespace
 
-AfConfig AfConfig::loadFromJson(const std::string& text) {
+AfConfig AfConfig::loadFromJson(const std::string& text)
+{
   json j;
-  try {
+  try
+  {
     j = json::parse(text);
-  } catch (const json::exception& e) {
+  }
+  catch (const json::exception& e)
+  {
     throw std::runtime_error(std::string("config: invalid JSON: ") + e.what());
   }
 
@@ -48,9 +62,18 @@ AfConfig AfConfig::loadFromJson(const std::string& text) {
   const auto& sensor = req(j, "sensor", "");
   const auto& pat = req(sensor, "pattern", "sensor");
   const auto type = reqAs<std::string>(pat, "type", "sensor.pattern");
-  if (type == "sparse") c.sensor.pattern.type = PdPatternDesc::Type::kSparse;
-  else if (type == "dual_pd") c.sensor.pattern.type = PdPatternDesc::Type::kDualPd;
-  else throw std::runtime_error("config: sensor.pattern.type must be 'sparse' or 'dual_pd'");
+  if (type == "sparse")
+  {
+    c.sensor.pattern.type = PdPatternDesc::Type::kSparse;
+  }
+  else if (type == "dual_pd")
+  {
+    c.sensor.pattern.type = PdPatternDesc::Type::kDualPd;
+  }
+  else
+  {
+    throw std::runtime_error("config: sensor.pattern.type must be 'sparse' or 'dual_pd'");
+  }
   c.sensor.pattern.pair_pitch_x = reqAs<int>(pat, "pair_pitch_x", "sensor.pattern");
   c.sensor.pattern.pair_pitch_y = reqAs<int>(pat, "pair_pitch_y", "sensor.pattern");
   const auto& roi = req(sensor, "default_roi", "sensor");
@@ -68,13 +91,16 @@ AfConfig AfConfig::loadFromJson(const std::string& text) {
   const auto& dcc = req(calib, "dcc", "calibration");
   c.calibration.dcc.step_min = reqAs<int>(dcc, "step_min", "calibration.dcc");
   c.calibration.dcc.step_max = reqAs<int>(dcc, "step_max", "calibration.dcc");
-  for (const auto& a : req(dcc, "anchors", "calibration.dcc")) {
+  for (const auto& a : req(dcc, "anchors", "calibration.dcc"))
+  {
     c.calibration.dcc.anchors.push_back(
         {reqAs<int>(a, "step", "calibration.dcc.anchors[]"),
          reqAs<float>(a, "steps_per_disparity", "calibration.dcc.anchors[]")});
   }
   if (c.calibration.dcc.anchors.empty())
+  {
     throw std::runtime_error("config: calibration.dcc.anchors must not be empty");
+  }
 
   const auto& tun = req(j, "tuning", "");
   c.tuning.shift_min = reqAs<int>(tun, "shift_min", "tuning");
@@ -87,7 +113,9 @@ AfConfig AfConfig::loadFromJson(const std::string& text) {
   const auto& sys = req(j, "system", "");
   c.system.mode = reqAs<std::string>(sys, "mode", "system");
   if (c.system.mode != "sim" && c.system.mode != "replay")
+  {
     throw std::runtime_error("config: system.mode must be 'sim' or 'replay'");
+  }
   c.system.log_dir = reqAs<std::string>(sys, "log_dir", "system");
   c.system.replay_dir = reqAs<std::string>(sys, "replay_dir", "system");
   const auto& sim = req(sys, "sim", "system");
@@ -103,12 +131,16 @@ AfConfig AfConfig::loadFromJson(const std::string& text) {
   return c;
 }
 
-AfConfig AfConfig::loadFromFile(const std::string& path) {
+AfConfig AfConfig::loadFromFile(const std::string& path)
+{
   std::ifstream f(path);
-  if (!f) throw std::runtime_error("config: cannot open file: " + path);
+  if (!f)
+  {
+    throw std::runtime_error("config: cannot open file: " + path);
+  }
   std::stringstream ss;
   ss << f.rdbuf();
   return loadFromJson(ss.str());
 }
 
-}  // namespace pdaf
+} // namespace pdaf

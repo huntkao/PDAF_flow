@@ -6,21 +6,25 @@
 #include <cstdint>
 #include <string>
 
-namespace pdaf {
+namespace pdaf
+{
 
-struct SensorConfig {
+struct SensorConfig
+{
   PdPatternDesc pattern;
   Roi default_roi;
   int roi_sample_width = 64;
   int roi_sample_height = 4;
 };
 
-struct CalibrationConfig {
+struct CalibrationConfig
+{
   LrcCalib lrc;
   DccTable dcc;
 };
 
-struct TuningConfig {
+struct TuningConfig
+{
   int shift_min = -16;
   int shift_max = 16;
   float confidence_threshold = 0.3f;
@@ -29,25 +33,28 @@ struct TuningConfig {
   int max_iterations = 6;
 };
 
-struct SimConfig {
+struct SimConfig
+{
   double object_distance_mm = 2000.0;
   int initial_step = 300;
   float noise_sigma = 0.01f;
   float gain_mismatch = 1.1f;
   int settle_frames = 3;
   uint32_t seed = 42;
-  int step_inf = 100;        // 無窮遠合焦 step
-  float focus_gain = 150000.f;  // in-focus step = step_inf + focus_gain / distance_mm
+  int step_inf = 100;          // 無窮遠合焦 step
+  float focus_gain = 150000.f; // in-focus step = step_inf + focus_gain / distance_mm
 };
 
-struct SystemConfig {
-  std::string mode = "sim";  // "sim" | "replay"
+struct SystemConfig
+{
+  std::string mode = "sim"; // "sim" | "replay"
   std::string log_dir = "out";
   std::string replay_dir;
   SimConfig sim;
 };
 
-struct AfConfig {
+struct AfConfig
+{
   SensorConfig sensor;
   CalibrationConfig calibration;
   TuningConfig tuning;
@@ -57,4 +64,4 @@ struct AfConfig {
   static AfConfig loadFromJson(const std::string& text);
 };
 
-}  // namespace pdaf
+} // namespace pdaf

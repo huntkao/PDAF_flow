@@ -11,16 +11,19 @@
 
 using namespace pdaf;
 
-namespace {
+namespace
+{
 
-struct RunResult {
+struct RunResult
+{
   AfState final_state;
   int frames_used;
   int final_error_steps;
 };
 
 // 框架的「活規格」：模擬器 + 全 pipeline 閉環
-RunResult runScenario(double dist_mm, int init_step, float noise_sigma) {
+RunResult runScenario(double dist_mm, int init_step, float noise_sigma)
+{
   SensorConfig sensor;
   sensor.roi_sample_width = 64;
   sensor.roi_sample_height = 4;
@@ -51,40 +54,48 @@ RunResult runScenario(double dist_mm, int init_step, float noise_sigma) {
 
   AfRequest req{{Roi{0, 0, 256, 128}}};
   int frames = 0;
-  for (; frames < 100; ++frames) {
+  for (; frames < 100; ++frames)
+  {
     auto in = source.capture(req);
     ctrl.onFrame(req, in);
-    if (ctrl.state() == AfState::kFocused || ctrl.state() == AfState::kFailed) break;
+    if (ctrl.state() == AfState::kFocused || ctrl.state() == AfState::kFailed)
+    {
+      break;
+    }
   }
   return {ctrl.state(), frames + 1,
           std::abs(world.currentStep() - world.inFocusStep())};
 }
 
-}  // namespace
+} // namespace
 
-TEST(ClosedLoop, MidDistanceConverges) {
-  auto r = runScenario(2000.0, 300, 0.01f);  // in-focus=175, d0=-2.5
+TEST(ClosedLoop, MidDistanceConverges)
+{
+  auto r = runScenario(2000.0, 300, 0.01f); // in-focus=175, d0=-2.5
   EXPECT_EQ(r.final_state, AfState::kFocused);
-  EXPECT_LE(r.final_error_steps, 20);  // 0.25 disparity*50 steps + 量測 sub-pixel 誤差
+  EXPECT_LE(r.final_error_steps, 20); // 0.25 disparity*50 steps + 量測 sub-pixel 誤差
   EXPECT_LT(r.frames_used, 40);
 }
 
-TEST(ClosedLoop, NearDistanceConverges) {
-  auto r = runScenario(300.0, 300, 0.01f);  // in-focus=600, d0=+6
-  EXPECT_EQ(r.final_state, AfState::kFocused);
-  EXPECT_LE(r.final_error_steps, 20);
-  EXPECT_LT(r.frames_used, 40);
-}
-
-TEST(ClosedLoop, FarDistanceLargeDefocusConverges) {
-  auto r = runScenario(5000.0, 600, 0.01f);  // in-focus=130, d0=-9.4
+TEST(ClosedLoop, NearDistanceConverges)
+{
+  auto r = runScenario(300.0, 300, 0.01f); // in-focus=600, d0=+6
   EXPECT_EQ(r.final_state, AfState::kFocused);
   EXPECT_LE(r.final_error_steps, 20);
   EXPECT_LT(r.frames_used, 40);
 }
 
-TEST(ClosedLoop, AlreadyInFocusFinishesImmediately) {
-  auto r = runScenario(2000.0, 175, 0.005f);  // 初始即合焦
+TEST(ClosedLoop, FarDistanceLargeDefocusConverges)
+{
+  auto r = runScenario(5000.0, 600, 0.01f); // in-focus=130, d0=-9.4
+  EXPECT_EQ(r.final_state, AfState::kFocused);
+  EXPECT_LE(r.final_error_steps, 20);
+  EXPECT_LT(r.frames_used, 40);
+}
+
+TEST(ClosedLoop, AlreadyInFocusFinishesImmediately)
+{
+  auto r = runScenario(2000.0, 175, 0.005f); // 初始即合焦
   EXPECT_EQ(r.final_state, AfState::kFocused);
   EXPECT_LE(r.frames_used, 5);
 }

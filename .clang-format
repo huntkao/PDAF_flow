@@ -1,0 +1,23 @@
+# PDAF_flow 專案風格：Allman brace style + 強制大括號
+# 以 LLVM 為底，2 空白縮排；ColumnLimit=0 避免重排長行，讓差異集中在大括號
+BasedOnStyle: LLVM
+IndentWidth: 2
+ColumnLimit: 0
+
+# 1) 所有 { 獨立一行（Allman）
+BreakBeforeBraces: Allman
+
+# 2) 單行控制敘述也補上大括號 + 換行（避免 if(x) return; 這種寫法）
+InsertBraces: true
+
+# 維持原碼的 & / * 貼型別寫法（const T& x），避免無關差異
+DerivePointerAlignment: false
+PointerAlignment: Left
+
+# 不把短敘述壓成一行，維持 Allman 的展開樣貌
+AllowShortFunctionsOnASingleLine: None
+AllowShortBlocksOnASingleLine: Never
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortEnumsOnASingleLine: false

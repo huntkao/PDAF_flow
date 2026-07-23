@@ -3,7 +3,8 @@
 
 using namespace pdaf;
 
-TEST(NullActuator, RecordsCommandAndNeverMoving) {
+TEST(NullActuator, RecordsCommandAndNeverMoving)
+{
   NullLensActuator act(300);
   EXPECT_EQ(act.getStatus().current_step, 300);
   EXPECT_FALSE(act.getStatus().moving);

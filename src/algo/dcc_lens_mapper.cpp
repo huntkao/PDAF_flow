@@ -3,15 +3,28 @@
 #include <algorithm>
 #include <cmath>
 
-namespace pdaf {
+namespace pdaf
+{
 
-float dccInterp(const DccTable& table, int step) {
+float dccInterp(const DccTable& table, int step)
+{
   const auto& a = table.anchors;
-  if (a.empty()) return 50.f;
-  if (step <= a.front().step) return a.front().steps_per_disparity;
-  if (step >= a.back().step) return a.back().steps_per_disparity;
-  for (size_t i = 1; i < a.size(); ++i) {
-    if (step <= a[i].step) {
+  if (a.empty())
+  {
+    return 50.f;
+  }
+  if (step <= a.front().step)
+  {
+    return a.front().steps_per_disparity;
+  }
+  if (step >= a.back().step)
+  {
+    return a.back().steps_per_disparity;
+  }
+  for (size_t i = 1; i < a.size(); ++i)
+  {
+    if (step <= a[i].step)
+    {
       const float t = static_cast<float>(step - a[i - 1].step) /
                       static_cast<float>(a[i].step - a[i - 1].step);
       return a[i - 1].steps_per_disparity +
@@ -21,10 +34,14 @@ float dccInterp(const DccTable& table, int step) {
   return a.back().steps_per_disparity;
 }
 
-void DccLensMapper::init(const DccTable& table) { table_ = table; }
+void DccLensMapper::init(const DccTable& table)
+{
+  table_ = table;
+}
 
 LensCommand DccLensMapper::toLensCommand(const DepthEstimate& est,
-                                         int lens_step_at_exposure) {
+                                         int lens_step_at_exposure)
+{
   const float k = dccInterp(table_, lens_step_at_exposure);
   int target = static_cast<int>(std::lround(lens_step_at_exposure + est.disparity * k));
   target = std::clamp(target, table_.step_min, table_.step_max);
@@ -32,4 +49,4 @@ LensCommand DccLensMapper::toLensCommand(const DepthEstimate& est,
   return {target, tol};
 }
 
-}  // namespace pdaf
+} // namespace pdaf

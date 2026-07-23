@@ -1,5 +1,5 @@
-#include <gtest/gtest.h>
 #include <control/run_logger.h>
+#include <gtest/gtest.h>
 
 #include <filesystem>
 #include <fstream>
@@ -8,13 +8,15 @@
 using namespace pdaf;
 namespace fs = std::filesystem;
 
-static std::string slurp(const fs::path& p) {
+static std::string slurp(const fs::path& p)
+{
   std::stringstream ss;
   ss << std::ifstream(p).rdbuf();
   return ss.str();
 }
 
-TEST(RunLogger, WritesCsvAndSummary) {
+TEST(RunLogger, WritesCsvAndSummary)
+{
   const auto dir = fs::temp_directory_path() / "pdaf_logger_test";
   fs::remove_all(dir);
   {
@@ -25,7 +27,8 @@ TEST(RunLogger, WritesCsvAndSummary) {
   }
   const auto csv = slurp(dir / "frames.csv");
   EXPECT_NE(csv.find("frame_id,state_before,state_after,disparity,confidence,"
-                     "lens_step,target_step,gt_disparity"), std::string::npos);
+                     "lens_step,target_step,gt_disparity"),
+            std::string::npos);
   EXPECT_NE(csv.find("7,MEASURING,MOVING,-2.5"), std::string::npos);
   const auto sum = slurp(dir / "summary.txt");
   EXPECT_NE(sum.find("final_state: FOCUSED"), std::string::npos);

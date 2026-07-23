@@ -6,14 +6,16 @@
 
 using namespace pdaf;
 
-static std::string readFile(const std::string& p) {
+static std::string readFile(const std::string& p)
+{
   std::ifstream f(p);
   std::stringstream ss;
   ss << f.rdbuf();
   return ss.str();
 }
 
-TEST(AfConfig, LoadsDefaultJson) {
+TEST(AfConfig, LoadsDefaultJson)
+{
   auto cfg = AfConfig::loadFromFile(std::string(PDAF_SOURCE_DIR) + "/config/default.json");
   EXPECT_EQ(cfg.sensor.pattern.type, PdPatternDesc::Type::kSparse);
   EXPECT_EQ(cfg.sensor.roi_sample_width, 64);
@@ -24,20 +26,25 @@ TEST(AfConfig, LoadsDefaultJson) {
   EXPECT_EQ(cfg.system.sim.settle_frames, 3);
 }
 
-TEST(AfConfig, MissingFieldThrowsWithFieldName) {
+TEST(AfConfig, MissingFieldThrowsWithFieldName)
+{
   auto text = readFile(std::string(PDAF_SOURCE_DIR) + "/config/default.json");
   auto pos = text.find("\"confidence_threshold\": 0.3,");
   ASSERT_NE(pos, std::string::npos);
   text.erase(pos, std::string("\"confidence_threshold\": 0.3,").size());
-  try {
+  try
+  {
     AfConfig::loadFromJson(text);
     FAIL() << "should throw";
-  } catch (const std::runtime_error& e) {
+  }
+  catch (const std::runtime_error& e)
+  {
     EXPECT_NE(std::string(e.what()).find("confidence_threshold"), std::string::npos);
   }
 }
 
-TEST(AfConfig, BadModeThrows) {
+TEST(AfConfig, BadModeThrows)
+{
   auto text = readFile(std::string(PDAF_SOURCE_DIR) + "/config/default.json");
   auto pos = text.find("\"sim\",");
   ASSERT_NE(pos, std::string::npos);
@@ -45,15 +52,20 @@ TEST(AfConfig, BadModeThrows) {
   EXPECT_THROW(AfConfig::loadFromJson(text), std::runtime_error);
 }
 
-TEST(AfConfig, MissingFileThrows) {
+TEST(AfConfig, MissingFileThrows)
+{
   EXPECT_THROW(AfConfig::loadFromFile("/no/such/file.json"), std::runtime_error);
 }
 
-TEST(AfConfig, MissingTopLevelSectionHasCleanPath) {
-  try {
+TEST(AfConfig, MissingTopLevelSectionHasCleanPath)
+{
+  try
+  {
     AfConfig::loadFromJson("{}");
     FAIL() << "should throw";
-  } catch (const std::runtime_error& e) {
+  }
+  catch (const std::runtime_error& e)
+  {
     const std::string msg = e.what();
     EXPECT_NE(msg.find("'sensor'"), std::string::npos) << msg;
     EXPECT_EQ(msg.find("'.sensor'"), std::string::npos) << msg;
