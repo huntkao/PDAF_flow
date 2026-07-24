@@ -12,5 +12,10 @@ target_sources(pdaf PRIVATE ${CMAKE_BINARY_DIR}/pdaf_dummy.cpp src/algo/paraboli
 
 add_subdirectory(apps)
 
+option(PDAF_BUILD_GUI "Build ImGui/ImPlot desktop tools" OFF)
+if(PDAF_BUILD_GUI)
+  add_subdirectory(tools)
+endif()
+
 enable_testing()
 add_subdirectory(tests)
