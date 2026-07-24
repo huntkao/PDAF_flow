@@ -13,7 +13,7 @@ flowchart LR
     M2 --> CTRL["AfController<br/>狀態機"]
     CTRL --> M3["M3 · 鏡頭映射<br/>DCC → VCM step"]
     M3 --> ACT["ILensActuator<br/>移動鏡頭"]
-    ACT -.閉環.-> SRC
+    ACT -.->|閉環| SRC
 ```
 
 `AfController` 逐 sensor frame 驅動狀態機 `IDLE → MEASURING → MOVING → SETTLING → VERIFYING → FOCUSED / FAILED`，並輸出每個 frame 的紀錄。
