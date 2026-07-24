@@ -26,7 +26,13 @@ ctest --preset default                            # run the whole suite (outputs
 ./build/apps/pdaf_cli --config config/default.json --out out
 #   config/{default,near,far}.json are three convergence scenarios (mid / near / far distance)
 #   --mode replay reads frame dumps from system.replay_dir instead of the simulator
+#   --dump-costs <dir> (sim mode only) writes each frame's post-M1 cost sequences as
+#     <dir>/frame_%04d.json (replay hw_costs format + ground_truth_disparity) — feeds pdaf_cost_viz
 #   outputs: <out>/frames.csv (per-frame state/disparity/confidence/lens_step) + <out>/summary.txt
+
+# M2 visualization tool (opt-in GUI, default OFF; needs OpenGL + X11 dev headers on Linux):
+cmake --preset default -DPDAF_BUILD_GUI=ON && cmake --build --preset default
+./build/tools/pdaf_cost_viz costs   # loads dumped cost frames, runs real estimateTraced(), plots + annotates
 ```
 
 Code style is `.clang-format` (Allman braces, 2-space indent, `ColumnLimit: 0`, `InsertBraces: true`); match it in any edit. A committed pre-commit hook (`.githooks/pre-commit`) blocks commits with unformatted C/C++ — enable it once per clone with `git config core.hooksPath .githooks`. Run `clang-format -i <file>` to fix violations. There is no other linter. All tests compile into one binary, `pdaf_tests` — new test files are added to the `add_executable(pdaf_tests ...)` list in `tests/CMakeLists.txt`, not as new targets. GoogleTest (v1.14.0) is fetched via FetchContent; nlohmann/json (v3.11.3) is vendored at `third_party/nlohmann/json.hpp`. No OpenCV — all image math is hand-written in the simulator.
@@ -50,6 +56,7 @@ These are load-bearing and span multiple files — the reason a change can pass 
 - **The simulator and M3 share the same `dccInterp` free function** (`include/pdaf/algo/lens_mapper.h`). The sim derives its ground-truth disparity through `dccInterp`, so the closed loop is self-consistent. Don't fork a second copy of that math into the simulator.
 - **Simulator texture frequencies must stay below π/(max_shift) ≈ 0.196 rad/sample** (for the ±16 shift window). `SimWorld::texture` uses `{0.07, 0.13, 0.19}`. A higher frequency whose period approaches the search-window width produces a false SAD cost minimum (aliasing) and breaks disparity measurement. If you widen the shift search window or change the texture, re-check this inequality.
 - **Runtime algorithm/control code never throws for bad data** — it degrades (invalid `DepthEstimate` with `confidence=0`, or a state-machine retry/fail transition). Only `AfConfig` loading fails fast, throwing `std::runtime_error` with the offending field path.
+- **`ParabolicDepthEstimator::estimate()` is a thin wrapper: `return estimateTraced(cost).result;`** — all the M2 math lives once in `estimateTraced()`, which also records the intermediates the `pdaf_cost_viz` tool visualizes. Never add computation to `estimate()`; put it in `estimateTraced()` so the tool keeps showing exactly what production computes.
 
 ## Convention notes
 

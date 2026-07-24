@@ -47,15 +47,34 @@ flowchart LR
 
 ## 建置與執行
 
+建置由 `CMakePresets.json` 驅動（Ninja）。請一律用 preset，避免 `cmake -B build` 選到不同 generator 與 build/ cache 相撞。
+
 ```bash
-cmake -B build && cmake --build build
-ctest --test-dir build --output-on-failure          # 全部測試
+cmake --preset default && cmake --build --preset default
+ctest --preset default                              # 全部測試
 
 ./build/apps/pdaf_cli --config config/default.json --out out
 # 輸出 out/frames.csv（逐 frame 狀態/disparity/confidence/lens step）+ out/summary.txt
 ```
 
-相依：GoogleTest v1.14.0（FetchContent 自動抓）、nlohmann/json v3.11.3（已 vendored 於 `third_party/`）。
+相依：GoogleTest v1.14.0（FetchContent 自動抓）、nlohmann/json v3.11.3（已 vendored 於 `third_party/`）。需 cmake ≥ 3.21 + ninja。
+
+### 視覺化驗證工具（M2）
+
+把 cost sequence 寫成實體檔、再用桌面 GUI 展圖並標示計算過程：
+
+```bash
+# 1) sim 每 frame 寫出 cost 檔（replay hw_costs 格式 + ground truth）
+./build/apps/pdaf_cli --config config/default.json --out out --dump-costs costs
+
+# 2) 建 GUI（opt-in，預設不建；需 OpenGL/X11 dev 標頭）
+cmake --preset default -DPDAF_BUILD_GUI=ON && cmake --build --preset default
+
+# 3) 載入檢視：cost 曲線 + cmin/mean/basin/次低點/三點/頂點@disparity/真值 + 中間值面板
+./build/tools/pdaf_cost_viz costs
+```
+
+`pdaf_cost_viz` 連結 `libpdaf`，行程內跑真實的 `ParabolicDepthEstimator::estimateTraced()`，圖上標的就是生產路徑實際算出的中間值。原理見上方 M2 圖解投影片。
 
 ## Demo 場景
 
