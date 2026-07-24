@@ -240,7 +240,7 @@ int main(int argc, char** argv)
   ImGui::CreateContext();
   ImPlot::CreateContext();
   ImGui_ImplGlfw_InitForOpenGL(win, true);
-  ImGui_ImplOpenGL3_Init("#version 130");
+  ImGui_ImplOpenGL3_Init("#version 150"); // GL 3.3 core profile 需 GLSL 150（130 在 core 不合規）
 
   ParabolicDepthEstimator m2;
 
