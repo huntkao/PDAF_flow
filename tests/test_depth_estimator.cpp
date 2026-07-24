@@ -1,6 +1,8 @@
 #include <algo/parabolic_depth_estimator.h>
 #include <gtest/gtest.h>
 
+#include <cmath>
+
 using namespace pdaf;
 
 static CostSequence makeCost(int shift_min, std::vector<float> costs, int valid = 100)
@@ -83,4 +85,75 @@ TEST(DepthEstimator, WideUnimodalValleyNotTreatedAsAmbiguous)
   EXPECT_TRUE(e.valid);
   EXPECT_NEAR(e.disparity, 0.f, 0.01f); // 對稱谷，谷底在中央
   EXPECT_GT(e.confidence, 0.5f);        // 單峰寬谷仍應可信
+}
+
+TEST(DepthEstimatorTrace, ResultMatchesEstimate)
+{
+  ParabolicDepthEstimator m2;
+  const std::vector<CostSequence> cases = {
+      makeCost(-4, {8, 6, 4, 2, 1, 0.2f, 1, 2, 4}),    // 一般
+      makeCost(-4, {0.2f, 1, 2, 4, 6, 8, 10, 12, 14}), // 邊界
+      makeCost(-4, std::vector<float>(9, 5.f)),        // 平（低 depth）
+      makeCost(-4, {8, 1.2f, 8, 3, 1, 3, 8, 1.3f, 8}), // 雙峰
+      makeCost(-4, {1, 2, 3, 4, 5, 6, 7, 8, 9}, 0),    // no samples
+  };
+  for (const auto& c : cases)
+  {
+    const DepthEstimate a = m2.estimate(c);
+    const DepthEstimate b = m2.estimateTraced(c).result;
+    EXPECT_EQ(a.valid, b.valid);
+    EXPECT_FLOAT_EQ(a.disparity, b.disparity);
+    EXPECT_FLOAT_EQ(a.confidence, b.confidence);
+  }
+}
+
+TEST(DepthEstimatorTrace, GoldenUnimodal)
+{
+  // {8,6,4,2,1,0.2,1,2,4} shift_min -4：full basin、無競爭谷
+  auto t = ParabolicDepthEstimator{}.estimateTraced(makeCost(-4, {8, 6, 4, 2, 1, 0.2f, 1, 2, 4}));
+  EXPECT_FALSE(t.degenerate_no_samples);
+  EXPECT_FALSE(t.degenerate_flat);
+  EXPECT_FALSE(t.boundary);
+  EXPECT_EQ(t.mi, 5u);
+  EXPECT_FLOAT_EQ(t.cmin, 0.2f);
+  EXPECT_NEAR(t.mean, 3.1333f, 1e-3f);
+  EXPECT_NEAR(t.depth, 0.9362f, 1e-3f);
+  EXPECT_EQ(t.basin_lo, 0u);
+  EXPECT_EQ(t.basin_hi, 8u);
+  EXPECT_TRUE(std::isinf(t.second)); // 無競爭谷
+  EXPECT_FLOAT_EQ(t.unamb, 1.f);
+  EXPECT_FLOAT_EQ(t.c_m1, 1.f);
+  EXPECT_FLOAT_EQ(t.c_0, 0.2f);
+  EXPECT_FLOAT_EQ(t.c_p1, 1.f);
+  EXPECT_NEAR(t.sharp, 0.8f, 1e-4f);
+  EXPECT_NEAR(t.delta, 0.f, 1e-4f);
+  EXPECT_NEAR(t.result.disparity, 1.f, 1e-4f);
+  EXPECT_NEAR(t.result.confidence, 0.8426f, 1e-3f);
+  EXPECT_TRUE(t.result.valid);
+}
+
+TEST(DepthEstimatorTrace, GoldenBimodalBasinAndSecond)
+{
+  // {8,1.2,8,3,1,3,8,1.3,8} shift_min -4：主谷 basin [2,6]、競爭谷 second=1.2
+  auto t = ParabolicDepthEstimator{}.estimateTraced(makeCost(-4, {8, 1.2f, 8, 3, 1, 3, 8, 1.3f, 8}));
+  EXPECT_EQ(t.mi, 4u);
+  EXPECT_EQ(t.basin_lo, 2u);
+  EXPECT_EQ(t.basin_hi, 6u);
+  EXPECT_FLOAT_EQ(t.second, 1.2f);
+  EXPECT_NEAR(t.unamb, 0.0554f, 1e-3f);
+  EXPECT_NEAR(t.result.disparity, 0.f, 1e-4f);
+  EXPECT_LT(t.result.confidence, 0.15f);
+}
+
+TEST(DepthEstimatorTrace, DegenerateFlagsSet)
+{
+  auto ns = ParabolicDepthEstimator{}.estimateTraced(makeCost(-4, {1, 2, 3, 4, 5, 6, 7, 8, 9}, 0));
+  EXPECT_TRUE(ns.degenerate_no_samples);
+  EXPECT_FALSE(ns.result.valid);
+  auto flat = ParabolicDepthEstimator{}.estimateTraced(makeCost(-4, std::vector<float>(9, 0.f)));
+  EXPECT_TRUE(flat.degenerate_flat);
+  EXPECT_FALSE(flat.result.valid);
+  auto edge = ParabolicDepthEstimator{}.estimateTraced(makeCost(-4, {0.2f, 1, 2, 4, 6, 8, 10, 12, 14}));
+  EXPECT_TRUE(edge.boundary);
+  EXPECT_TRUE(edge.result.valid);
 }

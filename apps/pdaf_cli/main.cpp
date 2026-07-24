@@ -5,6 +5,7 @@
 #include <control/run_logger.h>
 #include <pdaf/control/af_config.h>
 #include <pdaf/control/af_controller.h>
+#include <replay/cost_dump.h>
 #include <replay/null_lens_actuator.h>
 #include <replay/replay_pd_data_source.h>
 #include <sim/sim_world.h>
@@ -24,6 +25,7 @@ struct Args
   std::string mode; // 空 = 用 config 的值
   std::string out;  // 空 = 用 config 的 log_dir
   int max_frames = 200;
+  std::string dump_costs; // 空 = 不 dump
 };
 
 Args parseArgs(int argc, char** argv)
@@ -54,6 +56,10 @@ Args parseArgs(int argc, char** argv)
     else if (!std::strcmp(argv[i], "--max-frames"))
     {
       a.max_frames = std::atoi(need("--max-frames"));
+    }
+    else if (!std::strcmp(argv[i], "--dump-costs"))
+    {
+      a.dump_costs = need("--dump-costs");
     }
     else
     {
@@ -105,6 +111,17 @@ int main(int argc, char** argv)
     AfController ctrl(pipeline, mapper, *actuator, cfg.tuning);
     RunLogger logger(cfg.system.log_dir);
 
+    std::unique_ptr<SadCostEngine> dump_m1;
+    if (!args.dump_costs.empty() && cfg.system.mode == "sim")
+    {
+      dump_m1 = std::make_unique<SadCostEngine>();
+      dump_m1->init(cfg.calibration.lrc, cfg.sensor.pattern, cfg.tuning.shift_min, cfg.tuning.shift_max);
+    }
+    else if (!args.dump_costs.empty())
+    {
+      std::cerr << "warning: --dump-costs 只在 sim 模式有作用，已略過\n";
+    }
+
     ctrl.trigger();
     AfRequest req{{cfg.sensor.default_roi}};
     int frames = 0;
@@ -113,6 +130,12 @@ int main(int argc, char** argv)
       const PdInput in = source->capture(req);
       const AfFrameLog log = ctrl.onFrame(req, in);
       logger.logFrame(log, world ? world->groundTruthDisparity() : 0.f);
+      if (dump_m1 && in.raw)
+      {
+        auto costs = dump_m1->compute(*in.raw);
+        std::vector<float> gt(costs.size(), world->groundTruthDisparity());
+        writeCostFrame(args.dump_costs, in.meta, costs, gt);
+      }
       if (ctrl.state() == AfState::kFocused || ctrl.state() == AfState::kFailed)
       {
         break;
