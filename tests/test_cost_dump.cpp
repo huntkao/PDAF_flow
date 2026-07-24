@@ -20,10 +20,10 @@ TEST(CostDump, WritesReplayFormatWithGroundTruth)
   std::vector<CostSequence> costs = {CostSequence{-2, {5, 1, 5, 7, 9}, 40}};
   writeCostFrame(dir.string(), meta, costs, {-2.5f});
 
-  const auto file = dir / "frame_0003.json";
-  ASSERT_TRUE(fs::exists(file));
+  ASSERT_TRUE(fs::exists(dir / "frame_0003.json"));
+  EXPECT_FALSE(fs::exists(dir / "frame_0000.json")); // 只寫一個檔，不捏造其他 frame
 
-  std::ifstream f(file);
+  std::ifstream f(dir / "frame_0003.json");
   std::stringstream ss;
   ss << f.rdbuf();
   auto j = nlohmann::json::parse(ss.str());
@@ -34,12 +34,18 @@ TEST(CostDump, WritesReplayFormatWithGroundTruth)
   EXPECT_EQ(j["hw_costs"][0]["valid_samples"].get<int>(), 40);
   EXPECT_FLOAT_EQ(j["ground_truth_disparity"][0].get<float>(), -2.5f);
 
-  // 同一份檔案能被 replay 讀回（向下相容）
+  fs::remove_all(dir);
+}
+
+TEST(CostDump, DumpedFrame0ReadableByReplay)
+{
+  const auto dir = fs::temp_directory_path() / "pdaf_cost_dump_replay";
+  fs::remove_all(dir);
+  writeCostFrame(dir.string(), FrameMeta{0, 0.0, 300}, {CostSequence{-2, {5, 1, 5, 7, 9}, 40}}, {-2.5f});
   ReplayPdDataSource src(dir.string());
   auto in = src.capture(AfRequest{});
   ASSERT_TRUE(in.hw_costs.has_value());
   EXPECT_EQ((*in.hw_costs)[0].shift_min, -2);
-
   fs::remove_all(dir);
 }
 
