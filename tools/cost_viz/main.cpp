@@ -58,7 +58,7 @@ std::optional<LoadedFrame> parseFrameFile(const fs::path& file, std::string& err
   std::ifstream f(file);
   if (!f)
   {
-    err = "無法開啟 " + file.string();
+    err = "failed to open " + file.string();
     return std::nullopt;
   }
   std::stringstream ss;
@@ -84,7 +84,7 @@ std::optional<LoadedFrame> parseFrameFile(const fs::path& file, std::string& err
   }
   catch (const std::exception& e)
   {
-    err = std::string("解析失敗 ") + file.filename().string() + ": " + e.what();
+    err = std::string("failed to parse ") + file.filename().string() + ": " + e.what();
     return std::nullopt;
   }
 }
@@ -97,7 +97,7 @@ void loadPath(App& app, const std::string& path)
   app.error.clear();
   if (path.empty() || !fs::exists(path))
   {
-    app.error = "路徑不存在：" + path;
+    app.error = "path does not exist: " + path;
     return;
   }
   std::vector<fs::path> files;
@@ -116,7 +116,7 @@ void loadPath(App& app, const std::string& path)
     }
     if (files.empty())
     {
-      app.error = "目錄下無 frame_0000.json：" + path;
+      app.error = "no frame_0000.json in directory: " + path;
       return;
     }
   }
@@ -138,7 +138,53 @@ void loadPath(App& app, const std::string& path)
   }
 }
 
-void drawPlot(const CostSequence& c, const DepthEstimateTrace& t, const float* gt)
+// 數據面板：放在可捲動 child 內，欄位被拖窄時字會換行而非被裁掉
+void drawPanel(const LoadedFrame& lf, const CostSequence& c, const DepthEstimateTrace& t, const float* gt, float height)
+{
+  ImGui::BeginChild("panel_scroll", ImVec2(0, height), false, ImGuiWindowFlags_HorizontalScrollbar);
+  ImGui::PushTextWrapPos(0.0f);
+  ImGui::Text("frame_id: %llu", static_cast<unsigned long long>(lf.meta.frame_id));
+  ImGui::Text("lens@exposure: %d", lf.meta.lens_step_at_exposure);
+  ImGui::Text("shift: [%d, %d]  valid: %d", c.shift_min, c.shift_min + static_cast<int>(c.costs.size()) - 1, c.valid_samples);
+  ImGui::Separator();
+  if (t.degenerate_no_samples)
+  {
+    ImGui::TextColored(ImVec4(1, 0.5f, 0, 1), "degenerate: no samples -> invalid");
+  }
+  else if (t.degenerate_flat)
+  {
+    ImGui::TextColored(ImVec4(1, 0.5f, 0, 1), "degenerate: flat (no texture) -> invalid");
+  }
+  else
+  {
+    ImGui::Text("mi: %zu   cmin: %.4f   mean: %.4f", t.mi, t.cmin, t.mean);
+    ImGui::Text("depth: %.3f", t.depth);
+    ImGui::Text("basin: [%zu, %zu]", t.basin_lo, t.basin_hi);
+    ImGui::Text("second: %s", std::isinf(t.second) ? "inf (no competing valley)" : std::to_string(t.second).c_str());
+    ImGui::Text("unamb: %.3f", t.unamb);
+    if (t.boundary)
+    {
+      ImGui::TextColored(ImVec4(1, 0.6f, 0, 1), "boundary -> no interpolation, conf x0.5");
+    }
+    else
+    {
+      ImGui::Text("c-1,c0,c+1: %.4f, %.4f, %.4f", t.c_m1, t.c_0, t.c_p1);
+      ImGui::Text("sharp: %.3f   delta: %.4f", t.sharp, t.delta);
+    }
+    ImGui::Separator();
+    ImGui::Text("disparity: %.4f", t.result.disparity);
+    ImGui::Text("confidence: %.4f", t.result.confidence);
+    if (gt)
+    {
+      ImGui::Text("ground truth: %.4f", *gt);
+      ImGui::Text("error: %.4f", std::abs(t.result.disparity - *gt));
+    }
+  }
+  ImGui::PopTextWrapPos();
+  ImGui::EndChild();
+}
+
+void drawPlot(const CostSequence& c, const DepthEstimateTrace& t, const float* gt, float height)
 {
   const int nn = static_cast<int>(c.costs.size());
   std::vector<double> xs(nn), ys(nn);
@@ -147,7 +193,7 @@ void drawPlot(const CostSequence& c, const DepthEstimateTrace& t, const float* g
     xs[i] = c.shift_min + i;
     ys[i] = c.costs[i];
   }
-  if (ImPlot::BeginPlot("cost sequence", ImVec2(-1, -1)))
+  if (ImPlot::BeginPlot("cost sequence", ImVec2(-1, height)))
   {
     ImPlot::SetupAxes("shift s", "SAD cost");
     // basin 陰影
@@ -171,11 +217,36 @@ void drawPlot(const CostSequence& c, const DepthEstimateTrace& t, const float* g
       double mean = t.mean;
       ImPlot::PlotInfLines("mean", &mean, 1, ImPlotInfLinesFlags_Horizontal);
     }
+    // 內插出的拋物線：y(u) = a·u² + b·u + c_0，u 為相對 mi 的位移
+    if (!t.degenerate_no_samples && !t.degenerate_flat && !t.boundary)
+    {
+      const double a = 0.5 * (t.c_m1 - 2.0 * t.c_0 + t.c_p1);
+      const double b = 0.5 * (t.c_p1 - t.c_m1);
+      const double x0 = c.shift_min + static_cast<int>(t.mi);
+      constexpr int kSeg = 64;
+      std::vector<double> px(kSeg + 1), py(kSeg + 1);
+      for (int i = 0; i <= kSeg; ++i)
+      {
+        const double u = -1.5 + 3.0 * i / kSeg;
+        px[i] = x0 + u;
+        py[i] = a * u * u + b * u + t.c_0;
+      }
+      ImPlot::SetNextLineStyle(ImVec4(0.6f, 0.8f, 1.0f, 0.9f), 2.0f);
+      ImPlot::PlotLine("parabola fit", px.data(), py.data(), kSeg + 1);
+
+      // 拋物線頂點（次像素解）
+      double vx = x0 + t.delta;
+      double vy = a * t.delta * t.delta + b * t.delta + t.c_0;
+      ImPlot::SetNextMarkerStyle(ImPlotMarker_Diamond, 9, ImVec4(0.6f, 0.8f, 1.0f, 1.0f), 2.0f);
+      ImPlot::PlotScatter("vertex", &vx, &vy, 1);
+    }
     // cmin
     if (!t.degenerate_no_samples && !t.degenerate_flat)
     {
       double cx = c.shift_min + static_cast<int>(t.mi);
       double cy = t.cmin;
+      ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle, 13, ImVec4(1.0f, 0.35f, 0.35f, 0.35f), 2.5f,
+                                 ImVec4(1.0f, 0.35f, 0.35f, 1.0f));
       ImPlot::PlotScatter("cmin", &cx, &cy, 1);
     }
     // 次低點（有競爭谷）
@@ -192,17 +263,33 @@ void drawPlot(const CostSequence& c, const DepthEstimateTrace& t, const float* g
         }
       }
     }
-    // disparity 垂直線
+    // disparity 實線 + 真值改用頂部三角標記與誤差橫條，避免兩條垂直線重疊難分辨
+    const ImPlotRect lim = ImPlot::GetPlotLimits();
+    const ImVec4 kEst(1.0f, 0.35f, 0.35f, 1.0f);
+    const ImVec4 kGt(0.3f, 0.9f, 0.5f, 1.0f);
     if (t.result.valid)
     {
       double dx = t.result.disparity;
+      ImPlot::SetNextLineStyle(kEst, 2.0f);
       ImPlot::PlotInfLines("disparity", &dx, 1);
+      ImPlot::Annotation(dx, lim.Y.Min, kEst, ImVec2(0, -6), true, "est %.3f", dx);
     }
-    // 真值
     if (gt)
     {
-      double g = *gt;
-      ImPlot::PlotInfLines("ground truth", &g, 1);
+      const double g = *gt;
+      const double y_top = lim.Y.Max - 0.04 * lim.Y.Size();
+      ImPlot::SetNextMarkerStyle(ImPlotMarker_Down, 11, kGt, 1.0f, kGt);
+      ImPlot::PlotScatter("ground truth", &g, &y_top, 1);
+      ImPlot::Annotation(g, y_top, kGt, ImVec2(0, -14), true, "GT %.3f", g);
+
+      if (t.result.valid)
+      {
+        const double err_x[2] = {std::min(g, static_cast<double>(t.result.disparity)),
+                                 std::max(g, static_cast<double>(t.result.disparity))};
+        const double err_y[2] = {y_top, y_top};
+        ImPlot::SetNextLineStyle(ImVec4(1.0f, 0.85f, 0.2f, 0.9f), 3.0f);
+        ImPlot::PlotLine("error", err_x, err_y, 2);
+      }
     }
     ImPlot::EndPlot();
   }
@@ -236,9 +323,19 @@ int main(int argc, char** argv)
   glfwMakeContextCurrent(win);
   glfwSwapInterval(1);
 
+  float dpi_scale = 1.0f;
+  glfwGetWindowContentScale(win, &dpi_scale, nullptr);
+
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImPlot::CreateContext();
+
+  ImGuiIO& io = ImGui::GetIO();
+  ImFontConfig font_cfg;
+  font_cfg.SizePixels = 13.0f * dpi_scale;
+  io.Fonts->AddFontDefault(&font_cfg);
+  ImGui::GetStyle().ScaleAllSizes(dpi_scale);
+
   ImGui_ImplGlfw_InitForOpenGL(win, true);
   ImGui_ImplOpenGL3_Init("#version 150"); // GL 3.3 core profile 需 GLSL 150（130 在 core 不合規）
 
@@ -258,9 +355,9 @@ int main(int argc, char** argv)
                  ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
 
     ImGui::SetNextItemWidth(600);
-    ImGui::InputText("路徑（檔案或目錄）", app.path_buf, sizeof(app.path_buf));
+    ImGui::InputText("path (file or directory)", app.path_buf, sizeof(app.path_buf));
     ImGui::SameLine();
-    if (ImGui::Button("載入"))
+    if (ImGui::Button("Load"))
     {
       loadPath(app, app.path_buf);
     }
@@ -285,50 +382,19 @@ int main(int argc, char** argv)
         const DepthEstimateTrace t = m2.estimateTraced(c);
         const float* gt = (app.roi_idx < static_cast<int>(lf.gt.size())) ? &lf.gt[app.roi_idx] : nullptr;
 
-        // 左：數據面板；右：圖
-        ImGui::Columns(2, nullptr, true);
-        ImGui::SetColumnWidth(0, 340);
-        ImGui::Text("frame_id: %llu", static_cast<unsigned long long>(lf.meta.frame_id));
-        ImGui::Text("lens@exposure: %d", lf.meta.lens_step_at_exposure);
-        ImGui::Text("shift: [%d, %d]  valid: %d", c.shift_min,
-                    c.shift_min + static_cast<int>(c.costs.size()) - 1, c.valid_samples);
-        ImGui::Separator();
-        if (t.degenerate_no_samples)
+        // 左：數據面板；右：圖。用 Resizable table，欄寬由使用者拖曳後保留（Columns 每幀重設會彈回）
+        const float body_h = ImGui::GetContentRegionAvail().y;
+        if (ImGui::BeginTable("layout", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV))
         {
-          ImGui::TextColored(ImVec4(1, 0.5f, 0, 1), "degenerate: no samples → invalid");
+          ImGui::TableSetupColumn("panel", ImGuiTableColumnFlags_WidthFixed, 340.0f * dpi_scale);
+          ImGui::TableSetupColumn("plot", ImGuiTableColumnFlags_WidthStretch);
+          ImGui::TableNextRow();
+          ImGui::TableSetColumnIndex(0);
+          drawPanel(lf, c, t, gt, body_h);
+          ImGui::TableSetColumnIndex(1);
+          drawPlot(c, t, gt, body_h);
+          ImGui::EndTable();
         }
-        else if (t.degenerate_flat)
-        {
-          ImGui::TextColored(ImVec4(1, 0.5f, 0, 1), "degenerate: flat (無紋理) → invalid");
-        }
-        else
-        {
-          ImGui::Text("mi: %zu   cmin: %.4f   mean: %.4f", t.mi, t.cmin, t.mean);
-          ImGui::Text("depth: %.3f", t.depth);
-          ImGui::Text("basin: [%zu, %zu]", t.basin_lo, t.basin_hi);
-          ImGui::Text("second: %s", std::isinf(t.second) ? "inf (無競爭谷)" : std::to_string(t.second).c_str());
-          ImGui::Text("unamb: %.3f", t.unamb);
-          if (t.boundary)
-          {
-            ImGui::TextColored(ImVec4(1, 0.6f, 0, 1), "boundary → 不內插、conf×0.5");
-          }
-          else
-          {
-            ImGui::Text("c-1,c0,c+1: %.4f, %.4f, %.4f", t.c_m1, t.c_0, t.c_p1);
-            ImGui::Text("sharp: %.3f   delta: %.4f", t.sharp, t.delta);
-          }
-          ImGui::Separator();
-          ImGui::Text("disparity: %.4f", t.result.disparity);
-          ImGui::Text("confidence: %.4f", t.result.confidence);
-          if (gt)
-          {
-            ImGui::Text("ground truth: %.4f", *gt);
-            ImGui::Text("error: %.4f", std::abs(t.result.disparity - *gt));
-          }
-        }
-        ImGui::NextColumn();
-        drawPlot(c, t, gt);
-        ImGui::Columns(1);
       }
     }
     ImGui::End();
