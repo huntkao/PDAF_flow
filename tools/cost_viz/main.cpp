@@ -260,6 +260,8 @@ void drawPlot(const CostSequence& c, const DepthEstimateTrace& t, const float* g
         if ((i < static_cast<int>(t.basin_lo) || i > static_cast<int>(t.basin_hi)) && c.costs[i] == t.second)
         {
           double sx = xs[i], sy = ys[i];
+          ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle, 13, ImVec4(1.0f, 0.65f, 0.2f, 0.35f), 2.5f,
+                                     ImVec4(1.0f, 0.65f, 0.2f, 1.0f));
           ImPlot::PlotScatter("second", &sx, &sy, 1);
           break;
         }
@@ -316,7 +318,7 @@ int main(int argc, char** argv)
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-  GLFWwindow* win = glfwCreateWindow(1440, 860, "pdaf_cost_viz — M2 cost sequence", nullptr, nullptr);
+  GLFWwindow* win = glfwCreateWindow(1560, 920, "pdaf_cost_viz — M2 cost sequence", nullptr, nullptr);
   if (!win)
   {
     glfwTerminate();
@@ -331,7 +333,7 @@ int main(int argc, char** argv)
   {
     // UI（含 panel 固定寬度）依 dpi_scale 放大，但視窗本身用邏輯座標建立，
     // 不補回同樣的倍率會讓可用空間被放大後的 UI 擠壓——這正是「每次都要手拉視窗」的根因。
-    glfwSetWindowSize(win, static_cast<int>(1440 * dpi_scale), static_cast<int>(860 * dpi_scale));
+    glfwSetWindowSize(win, static_cast<int>(1560 * dpi_scale), static_cast<int>(920 * dpi_scale));
   }
 
   IMGUI_CHECKVERSION();
@@ -340,7 +342,7 @@ int main(int argc, char** argv)
 
   ImGuiIO& io = ImGui::GetIO();
   ImFontConfig font_cfg;
-  font_cfg.SizePixels = 13.0f * dpi_scale;
+  font_cfg.SizePixels = 19.0f * dpi_scale; // 13 對簡報/投影閱讀太小，放大到易於識別的尺寸
   io.Fonts->AddFontDefault(&font_cfg);
   ImGui::GetStyle().ScaleAllSizes(dpi_scale);
 
@@ -394,7 +396,7 @@ int main(int argc, char** argv)
         const float body_h = ImGui::GetContentRegionAvail().y;
         if (ImGui::BeginTable("layout", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV))
         {
-          ImGui::TableSetupColumn("panel", ImGuiTableColumnFlags_WidthFixed, 340.0f * dpi_scale);
+          ImGui::TableSetupColumn("panel", ImGuiTableColumnFlags_WidthFixed, 420.0f * dpi_scale);
           ImGui::TableSetupColumn("plot", ImGuiTableColumnFlags_WidthStretch);
           ImGui::TableNextRow();
           ImGui::TableSetColumnIndex(0);
