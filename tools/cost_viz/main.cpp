@@ -162,6 +162,9 @@ void drawPanel(const LoadedFrame& lf, const CostSequence& c, const DepthEstimate
     ImGui::Text("basin: [%zu, %zu]", t.basin_lo, t.basin_hi);
     ImGui::Text("second: %s", std::isinf(t.second) ? "inf (no competing valley)" : std::to_string(t.second).c_str());
     ImGui::Text("unamb: %.3f", t.unamb);
+    // unamb 只看 second 有多深，量不到 repeat pattern 常見的「多個近乎打平的競爭谷」；
+    // count_near 補上這個維度（見 docs/m2-repeat-pattern-confidence/）
+    ImGui::Text("count_near: %d", t.count_near);
     if (t.boundary)
     {
       ImGui::TextColored(ImVec4(1, 0.6f, 0, 1), "boundary -> no interpolation, conf x0.5");
@@ -251,20 +254,32 @@ void drawPlot(const CostSequence& c, const DepthEstimateTrace& t, const float* g
                                  ImVec4(1.0f, 0.35f, 0.35f, 1.0f));
       ImPlot::PlotScatter("cmin", &cx, &cy, 1);
     }
-    // 次低點（有競爭谷）
+    // 容忍帶內的競爭谷（count_near）：basin 外、深度落在 second 10% 容忍帶內的局部極小值，
+    // 定義需與 ParabolicDepthEstimator::estimateTraced() 保持一致，見該函式內的 kCountNearTolerance。
+    // second 本身必落在自己的容忍帶內，所以這組點永遠涵蓋 second，不再另外單獨標一次。
     if (!std::isinf(t.second))
     {
-      // 找 second 對應的 x（basin 外的最低點）
+      constexpr float kCountNearTolerance = 0.10f;
+      const float band = t.second * (1.0f + kCountNearTolerance);
+      std::vector<double> nx, ny;
       for (int i = 0; i < nn; ++i)
       {
-        if ((i < static_cast<int>(t.basin_lo) || i > static_cast<int>(t.basin_hi)) && c.costs[i] == t.second)
+        if (i < static_cast<int>(t.basin_lo) || i > static_cast<int>(t.basin_hi))
         {
-          double sx = xs[i], sy = ys[i];
-          ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle, 13, ImVec4(1.0f, 0.65f, 0.2f, 0.35f), 2.5f,
-                                     ImVec4(1.0f, 0.65f, 0.2f, 1.0f));
-          ImPlot::PlotScatter("second", &sx, &sy, 1);
-          break;
+          const bool left_ok = (i == 0) || (c.costs[i - 1] >= c.costs[i]);
+          const bool right_ok = (i + 1 == nn) || (c.costs[i + 1] >= c.costs[i]);
+          if (left_ok && right_ok && c.costs[i] <= band)
+          {
+            nx.push_back(xs[i]);
+            ny.push_back(ys[i]);
+          }
         }
+      }
+      if (!nx.empty())
+      {
+        ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle, 13, ImVec4(1.0f, 0.65f, 0.2f, 0.35f), 2.5f,
+                                   ImVec4(1.0f, 0.65f, 0.2f, 1.0f));
+        ImPlot::PlotScatter("near competitors", nx.data(), ny.data(), static_cast<int>(nx.size()));
       }
     }
     // disparity 實線 + 真值改用頂部三角標記與誤差橫條，避免兩條垂直線重疊難分辨
