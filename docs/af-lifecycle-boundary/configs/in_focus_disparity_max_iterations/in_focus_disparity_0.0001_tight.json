@@ -1,0 +1,60 @@
+{
+  "sensor": {
+    "pattern": {
+      "type": "sparse",
+      "pair_pitch_x": 16,
+      "pair_pitch_y": 16
+    },
+    "default_roi": {
+      "x": 960,
+      "y": 540,
+      "w": 256,
+      "h": 128
+    },
+    "roi_sample_width": 64,
+    "roi_sample_height": 4
+  },
+  "calibration": {
+    "lrc": {
+      "left_gain": 1.0,
+      "right_gain": 0.909
+    },
+    "dcc": {
+      "step_min": 0,
+      "step_max": 1023,
+      "anchors": [
+        {
+          "step": 0,
+          "steps_per_disparity": 50.0
+        },
+        {
+          "step": 1023,
+          "steps_per_disparity": 50.0
+        }
+      ]
+    }
+  },
+  "tuning": {
+    "shift_min": -16,
+    "shift_max": 16,
+    "confidence_threshold": 0.3,
+    "in_focus_disparity": 0.0001,
+    "max_retries": 3,
+    "max_iterations": 6
+  },
+  "system": {
+    "mode": "sim",
+    "log_dir": "out",
+    "replay_dir": "",
+    "sim": {
+      "object_distance_mm": 2000.0,
+      "initial_step": 300,
+      "noise_sigma": 0.01,
+      "gain_mismatch": 1.1,
+      "settle_frames": 3,
+      "seed": 42,
+      "step_inf": 100,
+      "focus_gain": 150000.0
+    }
+  }
+}

@@ -1,0 +1,1078 @@
+<title>AF 控制迴路生命週期 — 狀態機與情境特性</title>
+
+<style>
+  /* 投影片固定白底單一主題：不隨 viewer 深色模式切換，確保簡報放映時背景一致 */
+  :root {
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --surface-2: #f4f6f3;
+    --ink: #16211b;
+    --ink-dim: #5c6b60;
+    --ink-faint: #8a978c;
+    --line: #dbe3d9;
+    --accent: #1f6f52;
+    --accent-strong: #16543e;
+    --accent-soft: #e2eee5;
+    --accent-soft-2: #cfe3d5;
+    --serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--accent-soft-2); }
+  code { font-family: var(--mono); }
+
+  .page {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 4.5rem 1.6rem 6rem;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.9rem;
+  }
+  .eyebrow::before {
+    content: "";
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: 2.3rem;
+    line-height: 1.22;
+    margin: 0 0 0.9rem;
+    text-wrap: balance;
+    letter-spacing: -0.01em;
+    max-width: 26ch;
+  }
+  .dek {
+    font-size: 1.08rem;
+    color: var(--ink-dim);
+    max-width: 68ch;
+    margin: 0 0 3.4rem;
+    text-wrap: pretty;
+  }
+
+  section { margin-bottom: 3.6rem; }
+  section > h2 {
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: 1.4rem;
+    margin: 0 0 0.35rem;
+    letter-spacing: -0.005em;
+  }
+  section > .section-sub {
+    color: var(--ink-dim);
+    font-size: 0.96rem;
+    margin: 0 0 1.5rem;
+    max-width: 70ch;
+  }
+
+  /* ---- answer panel ---- */
+  .answer-panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 1.6rem 1.8rem;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 1.1rem 1.4rem;
+  }
+  .answer-panel .verdict {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-radius: 6px;
+    padding: 0.25rem 0.6rem;
+    height: fit-content;
+    white-space: nowrap;
+  }
+  .answer-panel p { margin: 0; }
+  .answer-panel p + p { margin-top: 0.7rem; }
+  .layer-diagram {
+    grid-column: 1 / -1;
+    margin-top: 0.6rem;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 1.2rem 1.3rem;
+    font-family: var(--mono);
+    font-size: 0.83rem;
+    background: var(--surface-2);
+  }
+  .layer-diagram .layer-label {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.7rem;
+    color: var(--ink-dim);
+  }
+  .layer-diagram .inner-box {
+    background: var(--accent-soft);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    padding: 0.7rem 0.9rem;
+    color: var(--ink);
+    margin-top: 0.7rem;
+  }
+  .layer-diagram .inner-box .layer-label { color: var(--accent); }
+  .states-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+  }
+  .pill {
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 20px;
+    border: 1px solid var(--line);
+    color: var(--ink-dim);
+    background: var(--surface);
+  }
+  .pill.hit { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+
+  /* ---- diagram card ---- */
+  .diagram-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 1.4rem 1.2rem 1.1rem;
+    overflow-x: auto;
+  }
+  .diagram-svg { width: 100%; height: auto; display: block; min-width: 760px; }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.6rem;
+    margin-top: 1.1rem;
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--ink-dim);
+  }
+  .legend .item { display: flex; align-items: center; gap: 0.5rem; }
+  .legend .swatch { width: 1.05rem; height: 0.78rem; border-radius: 3px; flex: none; }
+  .sw-measure { background: var(--accent); }
+  .sw-wait { background: var(--surface); border: 1.5px solid var(--accent); }
+  .sw-terminal-ok { background: var(--accent); }
+  .sw-terminal-fail { background: var(--surface); border: 1.5px dashed var(--accent); }
+
+  /* ---- scenario frame tracks ---- */
+  .scenario-block { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 1.3rem; }
+  .scenario-block + .scenario-block { margin-top: 1rem; }
+  .scenario-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .scenario-tag {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    color: var(--ink);
+    letter-spacing: 0.02em;
+  }
+  .scenario-result {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.05em;
+    padding: 0.2rem 0.65rem;
+    border-radius: 20px;
+  }
+  .scenario-result.ok { background: var(--accent); color: #fff; }
+  .scenario-result.bad { background: var(--surface); color: var(--accent); border: 1.5px dashed var(--accent); }
+
+  .frame-track {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    overflow-x: auto;
+    padding-bottom: 0.2rem;
+  }
+  .frame-chip {
+    flex: 0 0 auto;
+    width: 156px;
+    border-radius: 8px;
+    padding: 0.7rem 0.75rem;
+    border: 1.5px solid var(--line);
+    background: var(--surface);
+  }
+  .frame-chip.st-measure { border-color: var(--accent); background: var(--accent-soft); }
+  .frame-chip.st-wait { border: 1.5px dashed var(--ink-faint); background: var(--surface-2); }
+  .frame-chip.st-ok { border-color: var(--accent); background: var(--accent); }
+  .frame-chip.st-ok .chip-frame, .frame-chip.st-ok .chip-state, .frame-chip.st-ok .chip-data dt, .frame-chip.st-ok .chip-data dd { color: #fff; }
+  .frame-chip.st-fail { border: 1.5px dashed var(--accent); background: var(--surface); }
+
+  .chip-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 0.5rem;
+  }
+  .chip-frame {
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    color: var(--ink-faint);
+  }
+  .chip-state {
+    font-family: var(--mono);
+    font-size: 0.64rem;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    text-align: right;
+    line-height: 1.35;
+  }
+  .chip-data {
+    display: grid;
+    grid-template-columns: auto auto;
+    gap: 0.15rem 0.5rem;
+    margin: 0;
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 0.74rem;
+  }
+  .chip-data dt { color: var(--ink-faint); }
+  .chip-data dd { margin: 0; text-align: right; color: var(--ink); }
+  .chip-empty {
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    color: var(--ink-faint);
+    padding: 0.35rem 0;
+  }
+
+  .chip-arrow {
+    flex: 0 0 auto;
+    width: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink-faint);
+    font-size: 1rem;
+  }
+
+  .scenario-note {
+    font-size: 0.85rem;
+    color: var(--ink-dim);
+    margin: 0.8rem 0 0;
+    padding-top: 0.7rem;
+    border-top: 1px solid var(--line);
+  }
+  .scenario-note strong { color: var(--accent); font-weight: 600; }
+
+  /* ---- characteristics table ---- */
+  .char-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+  table.char-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface);
+    font-size: 0.92rem;
+  }
+  table.char-table th, table.char-table td {
+    text-align: left;
+    padding: 0.9rem 1.1rem;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  table.char-table thead th {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-dim);
+    background: var(--accent-soft);
+    border-bottom: 1px solid var(--line);
+  }
+  table.char-table tbody tr:last-child td { border-bottom: none; }
+  table.char-table td.scenario-name {
+    font-family: var(--serif);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  table.char-table td.mono { font-family: var(--mono); font-size: 0.83rem; color: var(--ink-dim); }
+
+  /* ---- appendix: source code ---- */
+  .appendix-card {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .appendix-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    padding: 1rem 1.3rem;
+    border-bottom: 1px solid var(--line);
+    background: var(--accent-soft);
+  }
+  .appendix-head .path {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    color: var(--accent-strong);
+    font-weight: 600;
+  }
+  .appendix-head .lines {
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    color: var(--ink-dim);
+  }
+  pre.code-block {
+    margin: 0;
+    padding: 1.3rem 1.4rem;
+    overflow-x: auto;
+    background: var(--surface);
+  }
+  pre.code-block code {
+    font-family: var(--mono);
+    font-size: 0.88rem;
+    line-height: 1.65;
+    color: var(--ink);
+    counter-reset: line;
+  }
+  pre.code-block .ln {
+    display: inline-block;
+    width: 2.4em;
+    color: var(--ink-faint);
+    user-select: none;
+    margin-right: 1em;
+    text-align: right;
+  }
+  pre.code-block .kw { color: var(--accent-strong); font-weight: 600; }
+  pre.code-block .tp { color: var(--accent); }
+  pre.code-block .cm { color: var(--ink-faint); font-style: italic; }
+
+  footer {
+    border-top: 1px solid var(--line);
+    padding-top: 1.4rem;
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    color: var(--ink-faint);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.6rem;
+  }
+
+  @media (max-width: 640px) {
+    h1 { font-size: 1.85rem; }
+    .page { padding: 3rem 1.1rem 4rem; }
+    .answer-panel { grid-template-columns: 1fr; }
+  }
+</style>
+
+<div class="page">
+
+  <div class="eyebrow">PDAF_flow · AfController</div>
+  <h1>生命週期狀態機：何時真的量測，何時只是等待</h1>
+  <p class="dek">
+    七個 <code>AfState</code> 中，只有兩個會呼叫 disparity search（M1 SAD cost + M2 拋物線內插）；
+    其餘都是控制鏡頭移動時序與收斂判斷的簿記狀態。這個區分，就是「frame 3 是否還沒到位」與
+    「frame 4 誤差反而較大」兩個疑問的根源。
+  </p>
+
+  <section>
+    <h2>狀態機是 disparity search 系統的核心嗎？</h2>
+    <p class="section-sub">不是同一層。狀態機是「排程 / 控制層」，disparity search 是它有條件呼叫的「運算層」。</p>
+    <div class="answer-panel">
+      <span class="verdict">分層</span>
+      <div>
+        <p>
+          <code>AfController::onFrame()</code> 的 switch-case 本身不含任何 SAD 匹配或拋物線內插邏輯——
+          它只決定「這一 frame 要不要呼叫 <code>handleMeasurement()</code>」。真正的 disparity search
+          （M1 + M2）被封裝在 <code>IFocusEstimator::process()</code> 裡，由 <code>handleMeasurement()</code> 呼叫。
+        </p>
+        <p>
+          而 <code>handleMeasurement()</code> 只在 <code>kMeasuring</code> 與 <code>kVerifying</code>
+          這兩個 case 被呼叫。<code>kMoving</code> / <code>kSettling</code> 純粹等待 actuator 到位，
+          不產生任何量測——這正是 frame 3 的 disparity/confidence 顯示為 0 的原因。
+        </p>
+      </div>
+      <div class="layer-diagram">
+        <span class="layer-label">控制層 — AfController FSM（排程 / 收斂判斷）</span>
+        <div class="states-list">
+          <span class="pill">IDLE</span>
+          <span class="pill hit">MEASURING</span>
+          <span class="pill">MOVING</span>
+          <span class="pill">SETTLING</span>
+          <span class="pill hit">VERIFYING</span>
+          <span class="pill">FOCUSED</span>
+          <span class="pill">FAILED</span>
+        </div>
+        <div class="inner-box">
+          <span class="layer-label">運算層 — Disparity Search（僅被綠色 pill 呼叫）</span><br>
+          M1 SadCostEngine（LRC + SAD） → M2 ParabolicDepthEstimator（cost-min + 拋物線次像素）
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>狀態轉移圖</h2>
+    <p class="section-sub">實心填色 = 該 frame 實際跑了 disparity search；空心外框 = 純等待、無量測。上方軌道通往 FOCUSED，下方軌道通往 FAILED。</p>
+    <div class="diagram-card">
+      <svg class="diagram-svg" viewBox="0 0 1650 560" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"></path>
+          </marker>
+        </defs>
+
+        <g fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)">
+          <!-- main chain -->
+          <path d="M130,252 L280,252"></path>
+          <path d="M470,252 L620,252"></path>
+          <path d="M770,252 L920,252"></path>
+          <path d="M1070,252 L1220,252"></path>
+          <!-- self loops -->
+          <path d="M330,220 C320,155 380,155 380,220"></path>
+          <path d="M995,220 C985,155 1045,155 1045,220"></path>
+          <path d="M1270,220 C1260,155 1320,155 1320,220"></path>
+          <!-- top rail: to FOCUSED -->
+          <path d="M420,220 L420,104 L1450,104" marker-end="none"></path>
+          <path d="M1360,220 L1360,104" marker-end="none"></path>
+          <path d="M1450,104 L1450,104" marker-end="url(#arrow)"></path>
+          <!-- bottom rail: to FAILED -->
+          <path d="M375,284 L375,468 L1450,468" marker-end="none"></path>
+          <path d="M1360,284 L1360,468" marker-end="none"></path>
+          <path d="M1450,468 L1450,468" marker-end="url(#arrow)"></path>
+          <!-- back edge: Verifying -> Moving (iterate) -->
+          <path d="M1250,284 L1250,360 L695,360 L695,284"></path>
+        </g>
+
+        <!-- arrowheads for the rail junctions (drawn as short stub with marker) -->
+        <g fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" marker-end="url(#arrow)">
+          <path d="M1440,104 L1450,104"></path>
+          <path d="M1440,468 L1450,468"></path>
+        </g>
+
+        <!-- ============ boxes ============ -->
+        <!-- IDLE -->
+        <g>
+          <rect x="20" y="220" width="110" height="64" rx="10" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.5"></rect>
+          <text x="75" y="258" text-anchor="middle" font-family="var(--sans)" font-size="19" font-weight="600" fill="var(--accent)">IDLE</text>
+        </g>
+
+        <!-- MEASURING -->
+        <g>
+          <rect x="280" y="220" width="190" height="64" rx="10" fill="var(--accent)"></rect>
+          <text x="375" y="248" text-anchor="middle" font-family="var(--sans)" font-size="20" font-weight="700" fill="#ffffff">MEASURING</text>
+          <text x="375" y="268" text-anchor="middle" font-family="var(--mono)" font-size="11" fill="#ffffff" opacity="0.85">runs M1 + M2</text>
+        </g>
+
+        <!-- MOVING -->
+        <g>
+          <rect x="620" y="220" width="150" height="64" rx="10" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.5"></rect>
+          <text x="695" y="248" text-anchor="middle" font-family="var(--sans)" font-size="19" font-weight="600" fill="var(--accent)">MOVING</text>
+          <text x="695" y="267" text-anchor="middle" font-family="var(--mono)" font-size="11" fill="var(--ink-dim)">no measurement</text>
+        </g>
+
+        <!-- SETTLING -->
+        <g>
+          <rect x="920" y="220" width="150" height="64" rx="10" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.5"></rect>
+          <text x="995" y="248" text-anchor="middle" font-family="var(--sans)" font-size="19" font-weight="600" fill="var(--accent)">SETTLING</text>
+          <text x="995" y="267" text-anchor="middle" font-family="var(--mono)" font-size="11" fill="var(--ink-dim)">no measurement</text>
+        </g>
+
+        <!-- VERIFYING -->
+        <g>
+          <rect x="1220" y="220" width="190" height="64" rx="10" fill="var(--accent)"></rect>
+          <text x="1315" y="248" text-anchor="middle" font-family="var(--sans)" font-size="20" font-weight="700" fill="#ffffff">VERIFYING</text>
+          <text x="1315" y="268" text-anchor="middle" font-family="var(--mono)" font-size="11" fill="#ffffff" opacity="0.85">runs M1 + M2</text>
+        </g>
+
+        <!-- FOCUSED -->
+        <g>
+          <rect x="1450" y="72" width="130" height="64" rx="10" fill="var(--accent)"></rect>
+          <text x="1515" y="100" text-anchor="middle" font-family="var(--sans)" font-size="19" font-weight="700" fill="#ffffff">✓ FOCUSED</text>
+          <text x="1515" y="119" text-anchor="middle" font-family="var(--mono)" font-size="10.5" fill="#ffffff" opacity="0.85">terminal</text>
+        </g>
+
+        <!-- FAILED -->
+        <g>
+          <rect x="1450" y="436" width="130" height="64" rx="10" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.8" stroke-dasharray="5 4"></rect>
+          <text x="1515" y="464" text-anchor="middle" font-family="var(--sans)" font-size="19" font-weight="700" fill="var(--accent)">✕ FAILED</text>
+          <text x="1515" y="483" text-anchor="middle" font-family="var(--mono)" font-size="10.5" fill="var(--ink-dim)">terminal</text>
+        </g>
+
+        <!-- ============ edge labels ============ -->
+        <text x="205" y="238" text-anchor="middle" font-family="var(--mono)" font-size="12.5" fill="var(--ink-dim)">trigger()</text>
+
+        <text x="545" y="230" text-anchor="middle" font-family="var(--mono)" font-size="12.5" fill="var(--ink-dim)">
+          <tspan x="545" dy="0">conf OK &amp;</tspan>
+          <tspan x="545" dy="15">|disp| ≥ thr</tspan>
+        </text>
+
+        <text x="845" y="230" text-anchor="middle" font-family="var(--mono)" font-size="12.5" fill="var(--ink-dim)">
+          <tspan x="845" dy="0">same frame,</tspan>
+          <tspan x="845" dy="15">no measurement</tspan>
+        </text>
+
+        <text x="1145" y="230" text-anchor="middle" font-family="var(--mono)" font-size="12.5" fill="var(--ink-dim)">
+          <tspan x="1145" dy="0">settled —</tspan>
+          <tspan x="1145" dy="15">state switch only</tspan>
+        </text>
+
+        <text x="355" y="150" text-anchor="middle" font-family="var(--mono)" font-size="12" fill="var(--ink-dim)">
+          <tspan x="355" dy="0">conf &lt; thr</tspan>
+          <tspan x="355" dy="14">(retry, no move)</tspan>
+        </text>
+        <text x="995" y="150" text-anchor="middle" font-family="var(--mono)" font-size="12" fill="var(--ink-dim)">still moving</text>
+        <text x="1295" y="150" text-anchor="middle" font-family="var(--mono)" font-size="12" fill="var(--ink-dim)">
+          <tspan x="1295" dy="0">conf &lt; thr</tspan>
+          <tspan x="1295" dy="14">(retry, no move)</tspan>
+        </text>
+
+        <text x="700" y="97" text-anchor="middle" font-family="var(--mono)" font-size="12.5" fill="var(--accent)">conf OK &amp; |disp| &lt; in_focus_disparity → FOCUSED</text>
+        <text x="700" y="461" text-anchor="middle" font-family="var(--mono)" font-size="12.5" fill="var(--accent)">retries &gt; max_retries → FAILED</text>
+
+        <text x="975" y="350" text-anchor="middle" font-family="var(--mono)" font-size="12.5" fill="var(--ink-dim)">iterate — conf OK &amp; |disp| ≥ thr（回到 MOVING 重新對焦）</text>
+
+      </svg>
+      <div class="legend">
+        <span class="item"><span class="swatch sw-measure"></span>MEASURING / VERIFYING — 執行 M1+M2</span>
+        <span class="item"><span class="swatch sw-wait"></span>IDLE / MOVING / SETTLING — 等待，無量測</span>
+        <span class="item"><span class="swatch sw-terminal-ok"></span>FOCUSED — 終止（成功）</span>
+        <span class="item"><span class="swatch sw-terminal-fail"></span>FAILED — 終止（失敗，虛線外框）</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>四組真實資料的 frame 生命週期</h2>
+    <p class="section-sub">
+      同一張狀態圖在不同輸入下的實際走法。前三組來自 <code>config/{default,near,far}.json</code>；
+      第四組是把 <code>confidence_threshold</code> 從 0.3 調到 0.8 逼出的重試 → 失敗路徑。
+    </p>
+
+    <div class="scenario-block">
+      <div class="scenario-head">
+        <span class="scenario-tag">MID · config/default.json · object_distance = 2000mm</span>
+        <span class="scenario-result ok">✓ FOCUSED · 5 frames</span>
+      </div>
+      <div class="frame-track">
+        <div class="frame-chip st-measure">
+          <div class="chip-top"><span class="chip-frame">f0</span><span class="chip-state">MEASURING<br>→MOVING</span></div>
+          <dl class="chip-data"><dt>disp</dt><dd>-2.497</dd><dt>gt</dt><dd>-2.500</dd><dt>conf</dt><dd>0.690</dd><dt>lens</dt><dd>300→175</dd></dl>
+        </div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-wait">
+          <div class="chip-top"><span class="chip-frame">f1</span><span class="chip-state">MOVING<br>→SETTLING</span></div>
+          <div class="chip-empty">— 無量測 —<br>lens=300</div>
+        </div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-wait">
+          <div class="chip-top"><span class="chip-frame">f2</span><span class="chip-state">SETTLING<br>→SETTLING</span></div>
+          <div class="chip-empty">— 無量測 —<br>lens=300</div>
+        </div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-wait">
+          <div class="chip-top"><span class="chip-frame">f3</span><span class="chip-state">SETTLING<br>→VERIFYING</span></div>
+          <div class="chip-empty">— 無量測 —<br>lens=175（剛到位）</div>
+        </div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-ok">
+          <div class="chip-top"><span class="chip-frame">f4</span><span class="chip-state">VERIFYING<br>→FOCUSED</span></div>
+          <dl class="chip-data"><dt>disp</dt><dd>-0.014</dd><dt>gt</dt><dd>0.000</dd><dt>conf</dt><dd>0.920</dd><dt>lens</dt><dd>175</dd></dl>
+        </div>
+      </div>
+    </div>
+
+    <div class="scenario-block">
+      <div class="scenario-head">
+        <span class="scenario-tag">NEAR · config/near.json</span>
+        <span class="scenario-result ok">✓ FOCUSED · 5 frames</span>
+      </div>
+      <div class="frame-track">
+        <div class="frame-chip st-measure">
+          <div class="chip-top"><span class="chip-frame">f0</span><span class="chip-state">MEASURING<br>→MOVING</span></div>
+          <dl class="chip-data"><dt>disp</dt><dd>6.004</dd><dt>gt</dt><dd>6.000</dd><dt>conf</dt><dd>0.906</dd><dt>lens</dt><dd>300→600</dd></dl>
+        </div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-wait"><div class="chip-top"><span class="chip-frame">f1</span><span class="chip-state">MOVING<br>→SETTLING</span></div><div class="chip-empty">— 無量測 —<br>lens=300</div></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-wait"><div class="chip-top"><span class="chip-frame">f2</span><span class="chip-state">SETTLING<br>→SETTLING</span></div><div class="chip-empty">— 無量測 —<br>lens=300</div></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-wait"><div class="chip-top"><span class="chip-frame">f3</span><span class="chip-state">SETTLING<br>→VERIFYING</span></div><div class="chip-empty">— 無量測 —<br>lens=600（剛到位）</div></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-ok">
+          <div class="chip-top"><span class="chip-frame">f4</span><span class="chip-state">VERIFYING<br>→FOCUSED</span></div>
+          <dl class="chip-data"><dt>disp</dt><dd>-0.014</dd><dt>gt</dt><dd>0.000</dd><dt>conf</dt><dd>0.920</dd><dt>lens</dt><dd>600</dd></dl>
+        </div>
+      </div>
+    </div>
+
+    <div class="scenario-block">
+      <div class="scenario-head">
+        <span class="scenario-tag">FAR · config/far.json</span>
+        <span class="scenario-result ok">✓ FOCUSED · 5 frames</span>
+      </div>
+      <div class="frame-track">
+        <div class="frame-chip st-measure">
+          <div class="chip-top"><span class="chip-frame">f0</span><span class="chip-state">MEASURING<br>→MOVING</span></div>
+          <dl class="chip-data"><dt>disp</dt><dd>-9.335</dd><dt>gt</dt><dd>-9.400</dd><dt>conf</dt><dd>0.754</dd><dt>lens</dt><dd>600→133</dd></dl>
+        </div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-wait"><div class="chip-top"><span class="chip-frame">f1</span><span class="chip-state">MOVING<br>→SETTLING</span></div><div class="chip-empty">— 無量測 —<br>lens=600</div></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-wait"><div class="chip-top"><span class="chip-frame">f2</span><span class="chip-state">SETTLING<br>→SETTLING</span></div><div class="chip-empty">— 無量測 —<br>lens=600</div></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-wait"><div class="chip-top"><span class="chip-frame">f3</span><span class="chip-state">SETTLING<br>→VERIFYING</span></div><div class="chip-empty">— 無量測 —<br>lens=133（剛到位）</div></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-ok">
+          <div class="chip-top"><span class="chip-frame">f4</span><span class="chip-state">VERIFYING<br>→FOCUSED</span></div>
+          <dl class="chip-data"><dt>disp</dt><dd>-0.048</dd><dt>gt</dt><dd>-0.060</dd><dt>conf</dt><dd>0.905</dd><dt>lens</dt><dd>133</dd></dl>
+        </div>
+      </div>
+      <p class="scenario-note"><strong>注意</strong> f0 的 |gt disparity|=9.4 已逼近 ±16 搜尋窗一半，f0 絕對誤差（0.065）明顯大於 mid（0.003）／near（0.004）。</p>
+    </div>
+
+    <div class="scenario-block">
+      <div class="scenario-head">
+        <span class="scenario-tag">RETRY → FAIL · confidence_threshold 0.3 → 0.8</span>
+        <span class="scenario-result bad">✕ FAILED · 4 frames</span>
+      </div>
+      <div class="frame-track">
+        <div class="frame-chip st-measure">
+          <div class="chip-top"><span class="chip-frame">f0</span><span class="chip-state">MEASURING<br>→MEASURING</span></div>
+          <dl class="chip-data"><dt>disp</dt><dd>-2.497</dd><dt>conf</dt><dd>0.690</dd><dt>lens</dt><dd>300</dd><dt>retry</dt><dd>1/3</dd></dl>
+        </div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-measure">
+          <div class="chip-top"><span class="chip-frame">f1</span><span class="chip-state">MEASURING<br>→MEASURING</span></div>
+          <dl class="chip-data"><dt>disp</dt><dd>-2.521</dd><dt>conf</dt><dd>0.690</dd><dt>lens</dt><dd>300</dd><dt>retry</dt><dd>2/3</dd></dl>
+        </div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-measure">
+          <div class="chip-top"><span class="chip-frame">f2</span><span class="chip-state">MEASURING<br>→MEASURING</span></div>
+          <dl class="chip-data"><dt>disp</dt><dd>-2.520</dd><dt>conf</dt><dd>0.692</dd><dt>lens</dt><dd>300</dd><dt>retry</dt><dd>3/3</dd></dl>
+        </div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-fail">
+          <div class="chip-top"><span class="chip-frame">f3</span><span class="chip-state">MEASURING<br>→FAILED</span></div>
+          <dl class="chip-data"><dt>disp</dt><dd>-2.493</dd><dt>conf</dt><dd>0.691</dd><dt>lens</dt><dd>300</dd><dt>retry</dt><dd>4&gt;3</dd></dl>
+        </div>
+      </div>
+      <p class="scenario-note"><strong>注意</strong> 四個 frame 的 lens_step 全部是 300、target_step 全部是 0 — mapper 從未被呼叫，重試是「原地」的，只靠雜訊隨機性賭下一次 conf 過門檻，這裡谷底形狀穩定（conf 全落在 0.690±0.002），賭不到，滿 retry 後直接 FAILED。</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>情境特性整理</h2>
+    <div class="char-table-wrap">
+      <table class="char-table">
+        <thead>
+          <tr><th>情境</th><th>觸發條件</th><th>Log 訊號特徵</th><th>特性 / 陷阱</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="scenario-name">正常收斂<br><span class="mono" style="font-size:.78rem">mid / near / far</span></td>
+            <td>conf ≥ threshold 且一次移動即落入 <code>in_focus_disparity</code> 容忍區</td>
+            <td class="mono">f3 disp/conf=0（純狀態切換）；f4 才是真實 verify 量測</td>
+            <td>三情境 f4 殘差量級相近（conf 0.90–0.92），顯示系統對起始距離不敏感；f0 絕對誤差則隨真實 disparity 增大而放大</td>
+          </tr>
+          <tr>
+            <td class="scenario-name">Bookkeeping-only frame<br><span class="mono" style="font-size:.78rem">每個情境的 f3</span></td>
+            <td><code>settle_counter_</code> 剛好在該 frame 倒數到 0</td>
+            <td>disparity/confidence=0，但 lens_step 已是新值</td>
+            <td>0 值不是「量到 0」，是未執行量測的預設值；必須配合 state_before/after 才能正確解讀</td>
+          </tr>
+          <tr>
+            <td class="scenario-name">搜尋窗邊界效應<br><span class="mono" style="font-size:.78rem">far</span></td>
+            <td>真實 disparity 幅度接近 ±16 搜尋窗的一半</td>
+            <td>f0 絕對誤差 0.065，約為 mid 的 20 倍</td>
+            <td>拋物線次像素內插在靠近窗邊時精度下降，但不影響最終收斂——M3 閉環一次移動後就近乎完全修正</td>
+          </tr>
+          <tr>
+            <td class="scenario-name">低信心重試<br><span class="mono" style="font-size:.78rem">threshold 0.3→0.8</span></td>
+            <td>連續 <code>conf &lt; threshold</code></td>
+            <td>lens_step / target_step 完全不變；conf 在極小範圍內抖動</td>
+            <td>重試不換鏡頭位置，只靠雜訊賭運氣；谷底形狀（depth/unamb/sharp）由紋理決定，穩定時重試基本無效，會吃滿 <code>max_retries</code> 直接 FAILED</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>邊界行為測試 — <code>in_focus_disparity</code> / <code>max_iterations</code></h2>
+    <p class="section-sub">
+      以 mid 情境（<code>config/default.json</code>，f0 disparity=-2.497）為基準，只改動單一 tuning 參數，觀察狀態機在邊界值上的行為。
+    </p>
+
+    <div class="answer-panel" style="margin-bottom:1.4rem;">
+      <span class="verdict">結論</span>
+      <div>
+        <p><strong>容忍區(in_focus_disparity)太鬆</strong>：狀態機會把明顯還沒對到焦的畫面直接判 FOCUSED，鏡頭從未移動——這是調參時真正的風險，容忍區必須小於系統實際能達到的殘差量級，而不是「數值看起來合理」就好。</p>
+        <p><strong>容忍區太緊</strong>：撞到的是感測雜訊 / 量化底噪（約 0.001–0.01 disparity 量級），不是演算法收斂不了——這條邊界揭示的是硬體精度極限，調更多次迭代也無法突破。</p>
+        <p><strong>max_iterations</strong> 的安全值是情境相關的：mid 情境剛好只需要 1 次移動即可收斂，<code>=0</code> 會直接失敗、<code>=1</code> 剛好夠——這條分界線在其他情境（例如 far）下會不同。</p>
+      </div>
+    </div>
+
+    <div class="scenario-block">
+      <div class="scenario-head">
+        <span class="scenario-tag">in_focus_disparity = 5.0（遠大於 f0 |disp|=2.497）</span>
+        <span class="scenario-result ok">✓ FOCUSED · 1 frame</span>
+      </div>
+      <div class="frame-track">
+        <div class="frame-chip st-measure">
+          <div class="chip-top"><span class="chip-frame">f0</span><span class="chip-state">MEASURING<br>→FOCUSED</span></div>
+          <dl class="chip-data"><dt>disp</dt><dd>-2.497</dd><dt>gt</dt><dd>-2.500</dd><dt>conf</dt><dd>0.690</dd><dt>lens</dt><dd>300（未移動）</dd></dl>
+        </div>
+      </div>
+      <p class="scenario-note"><strong>風險</strong> <code>mapper</code>/<code>moveTo</code> 從未被呼叫，鏡頭停在初始位置 300 就被判定「已對焦」，實際上離真正的合焦位置 175 還很遠。</p>
+    </div>
+
+    <div class="scenario-block">
+      <div class="scenario-head">
+        <span class="scenario-tag">in_focus_disparity = 0.0001（遠小於雜訊底噪）</span>
+        <span class="scenario-result bad">✕ FAILED · 19 frames</span>
+      </div>
+      <div class="frame-track">
+        <div class="frame-chip st-measure"><div class="chip-top"><span class="chip-frame">f0</span><span class="chip-state">MEASURING<br>→MOVING</span></div><dl class="chip-data"><dt>disp</dt><dd>-2.497</dd><dt>conf</dt><dd>0.690</dd><dt>lens</dt><dd>300→175</dd></dl></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-wait"><div class="chip-top"><span class="chip-frame">f1</span><span class="chip-state">MOVING<br>→SETTLING</span></div><div class="chip-empty">— 無量測 —<br>lens=300</div></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-wait"><div class="chip-top"><span class="chip-frame">f2</span><span class="chip-state">SETTLING<br>→SETTLING</span></div><div class="chip-empty">— 無量測 —<br>lens=300</div></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-wait"><div class="chip-top"><span class="chip-frame">f3</span><span class="chip-state">SETTLING<br>→VERIFYING</span></div><div class="chip-empty">— 無量測 —<br>lens=175</div></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-measure"><div class="chip-top"><span class="chip-frame">f4</span><span class="chip-state">VERIFYING<br>→MOVING</span></div><dl class="chip-data"><dt>disp</dt><dd>-0.0138</dd><dt>conf</dt><dd>0.920</dd><dt>lens</dt><dd>175→174</dd><dt>iter</dt><dd>2</dd></dl></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-wait"><div class="chip-top"><span class="chip-frame">f5</span><span class="chip-state">MOVING<br>→SETTLING</span></div><div class="chip-empty">— 無量測 —<br>lens=175</div></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-wait"><div class="chip-top"><span class="chip-frame">f6</span><span class="chip-state">SETTLING<br>→SETTLING</span></div><div class="chip-empty">— 無量測 —<br>lens=175</div></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-wait"><div class="chip-top"><span class="chip-frame">f7</span><span class="chip-state">SETTLING<br>→VERIFYING</span></div><div class="chip-empty">— 無量測 —<br>lens=174</div></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-measure"><div class="chip-top"><span class="chip-frame">f8</span><span class="chip-state">VERIFYING<br>→MOVING</span></div><dl class="chip-data"><dt>disp</dt><dd>0.0137</dd><dt>conf</dt><dd>0.917</dd><dt>lens</dt><dd>174→175</dd><dt>iter</dt><dd>3</dd></dl></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-wait"><div class="chip-top"><span class="chip-frame">f9</span><span class="chip-state">MOVING<br>→SETTLING</span></div><div class="chip-empty">— 無量測 —<br>lens=174</div></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-wait"><div class="chip-top"><span class="chip-frame">f10</span><span class="chip-state">SETTLING<br>→SETTLING</span></div><div class="chip-empty">— 無量測 —<br>lens=174</div></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-wait"><div class="chip-top"><span class="chip-frame">f11</span><span class="chip-state">SETTLING<br>→VERIFYING</span></div><div class="chip-empty">— 無量測 —<br>lens=175</div></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-measure"><div class="chip-top"><span class="chip-frame">f12</span><span class="chip-state">VERIFYING<br>→MOVING</span></div><dl class="chip-data"><dt>disp</dt><dd>-0.0012</dd><dt>conf</dt><dd>0.925</dd><dt>lens</dt><dd>175→175</dd><dt>iter</dt><dd>4</dd></dl></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-wait"><div class="chip-top"><span class="chip-frame">f13</span><span class="chip-state">MOVING<br>→VERIFYING</span></div><div class="chip-empty">— 無量測 —<br>target==current<br>跳過 SETTLING</div></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-measure"><div class="chip-top"><span class="chip-frame">f14</span><span class="chip-state">VERIFYING<br>→MOVING</span></div><dl class="chip-data"><dt>disp</dt><dd>0.0048</dd><dt>conf</dt><dd>0.916</dd><dt>lens</dt><dd>175→175</dd><dt>iter</dt><dd>5</dd></dl></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-wait"><div class="chip-top"><span class="chip-frame">f15</span><span class="chip-state">MOVING<br>→VERIFYING</span></div><div class="chip-empty">— 無量測 —<br>target==current<br>跳過 SETTLING</div></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-measure"><div class="chip-top"><span class="chip-frame">f16</span><span class="chip-state">VERIFYING<br>→MOVING</span></div><dl class="chip-data"><dt>disp</dt><dd>0.0025</dd><dt>conf</dt><dd>0.927</dd><dt>lens</dt><dd>175→175</dd><dt>iter</dt><dd>6</dd></dl></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-wait"><div class="chip-top"><span class="chip-frame">f17</span><span class="chip-state">MOVING<br>→VERIFYING</span></div><div class="chip-empty">— 無量測 —<br>target==current<br>跳過 SETTLING</div></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-fail"><div class="chip-top"><span class="chip-frame">f18</span><span class="chip-state">VERIFYING<br>→FAILED</span></div><dl class="chip-data"><dt>disp</dt><dd>0.0003</dd><dt>conf</dt><dd>0.918</dd><dt>iter</dt><dd>7&gt;6</dd></dl></div>
+        </div>
+      </div>
+      <p class="scenario-note">
+        <strong>f13 / f15 / f17</strong> 出現 <code>MOVING→VERIFYING</code> 直接跳過 <code>SETTLING</code>：M3 算出的修正量四捨五入後 <code>target_step == current_step</code>（175→175），<code>moveTo()</code> 不觸發 <code>settle_counter_</code>，<code>actuator.getStatus().moving</code> 從一開始就是 false，<code>kMoving</code> case 的 <code>[[fallthrough]]</code> 在同一 frame 內直接把狀態帶到 <code>kVerifying</code>——狀態圖上沒有畫出、但程式碼確實存在的捷徑路徑。<br>
+        <strong>f18</strong> disparity 已經只剩 0.0003，仍大於門檻 0.0001，第 7 次迭代（<code>iterations_=7 &gt; max_iterations=6</code>）觸發 FAILED——卡住的是雜訊底噪，不是邏輯錯誤。
+      </p>
+    </div>
+
+    <div class="scenario-block">
+      <div class="scenario-head">
+        <span class="scenario-tag">max_iterations = 0</span>
+        <span class="scenario-result bad">✕ FAILED · 1 frame</span>
+      </div>
+      <div class="frame-track">
+        <div class="frame-chip st-fail">
+          <div class="chip-top"><span class="chip-frame">f0</span><span class="chip-state">MEASURING<br>→FAILED</span></div>
+          <dl class="chip-data"><dt>disp</dt><dd>-2.497</dd><dt>conf</dt><dd>0.690</dd><dt>lens</dt><dd>300（未移動）</dd><dt>iter</dt><dd>1&gt;0</dd></dl>
+        </div>
+      </div>
+      <p class="scenario-note"><code>iterations_=1 &gt; max_iterations=0</code> 在第一次量測後立即失敗，<code>mapper</code>/<code>moveTo</code> 從未執行——證明這個檢查發生在「決定要不要移動鏡頭」之前，<code>=0</code> 等同完全禁止移動。</p>
+    </div>
+
+    <div class="scenario-block">
+      <div class="scenario-head">
+        <span class="scenario-tag">max_iterations = 1（mid 情境剛好只需要 1 次移動）</span>
+        <span class="scenario-result ok">✓ FOCUSED · 5 frames</span>
+      </div>
+      <div class="frame-track">
+        <div class="frame-chip st-measure"><div class="chip-top"><span class="chip-frame">f0</span><span class="chip-state">MEASURING<br>→MOVING</span></div><dl class="chip-data"><dt>disp</dt><dd>-2.497</dd><dt>conf</dt><dd>0.690</dd><dt>lens</dt><dd>300→175</dd><dt>iter</dt><dd>1</dd></dl></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-wait"><div class="chip-top"><span class="chip-frame">f1</span><span class="chip-state">MOVING<br>→SETTLING</span></div><div class="chip-empty">— 無量測 —</div></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-wait"><div class="chip-top"><span class="chip-frame">f2</span><span class="chip-state">SETTLING<br>→SETTLING</span></div><div class="chip-empty">— 無量測 —</div></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-wait"><div class="chip-top"><span class="chip-frame">f3</span><span class="chip-state">SETTLING<br>→VERIFYING</span></div><div class="chip-empty">— 無量測 —</div></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-ok"><div class="chip-top"><span class="chip-frame">f4</span><span class="chip-state">VERIFYING<br>→FOCUSED</span></div><dl class="chip-data"><dt>disp</dt><dd>-0.014</dd><dt>conf</dt><dd>0.920</dd><dt>lens</dt><dd>175</dd></dl></div>
+      </div>
+      <p class="scenario-note">與預設值（<code>max_iterations=6</code>）結果完全相同——<code>=0</code> 會失敗、<code>=1</code> 剛好夠，成功/失敗的分界線就落在這兩個值之間，且這條線在其他情境（例如需要多次修正的 far）下會不同。</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>邊界行為測試 — <code>confidence_threshold</code> × <code>max_retries</code></h2>
+    <p class="section-sub">
+      同樣以 mid 情境為基準（f0 disparity=-2.497，理論 confidence≈0.690±0.01 的雜訊帶）。
+      這組參數與前一組不同：<code>in_focus_disparity</code>/<code>max_iterations</code> 決定「移動幾次」，
+      這組決定的是「每次量測要不要相信」。
+    </p>
+
+    <div class="answer-panel" style="margin-bottom:1.4rem;">
+      <span class="verdict">結論</span>
+      <div>
+        <p><strong>門檻比較是嚴格小於（<code>conf &lt; threshold</code>）</strong>：threshold 剛好等於當次 confidence 時視為通過，不會誤觸重試——這是精確的邊界，不是「差不多」。</p>
+        <p><strong>threshold 落在 confidence 雜訊帶內時，重試變成賭運氣</strong>：同一顆鏡頭位置反覆量測，靠 RNG 雜訊讓某一次剛好跨過門檻，成功但多花幾個 frame，而且最終收斂到的 lens_step 會因為「用哪一次量到的 disparity」而有些微差異（174 vs 175）。</p>
+        <p><strong><code>max_retries</code> 是硬上限，不保証機率</strong>：FAILED 固定發生在第 <code>max_retries+2</code> 次量測（第 1 次 + <code>max_retries</code> 次重試後再判一次）。但如果 threshold 高於這個情境 confidence 分布的天花板，重試預算再大也沒用——賭桌本身就贏不了。</p>
+      </div>
+    </div>
+
+    <h3 style="font-family:var(--serif);font-weight:500;font-size:1.08rem;margin:0 0 .8rem;">threshold 精度邊界</h3>
+    <div class="scenario-block">
+      <div class="scenario-head">
+        <span class="scenario-tag">threshold = 0.689883（與 f0 conf 完全相等）</span>
+        <span class="scenario-result ok">✓ FOCUSED · 5 frames · 立即通過</span>
+      </div>
+      <div class="frame-track">
+        <div class="frame-chip st-measure"><div class="chip-top"><span class="chip-frame">f0</span><span class="chip-state">MEASURING<br>→MOVING</span></div><dl class="chip-data"><dt>conf</dt><dd>0.689883</dd><dt>thr</dt><dd>0.689883</dd><dt>判定</dt><dd>通過</dd></dl></div>
+      </div>
+      <p class="scenario-note"><code>0.689883 &lt; 0.689883</code> 為 false → 不觸發 retry。等於門檻視為「足夠可信」。</p>
+    </div>
+
+    <div class="scenario-block">
+      <div class="scenario-head">
+        <span class="scenario-tag">threshold = 0.6899（僅高於 f0 conf 約 0.00002）</span>
+        <span class="scenario-result ok">✓ FOCUSED · 6 frames · 翻轉為需要 1 次 retry</span>
+      </div>
+      <div class="frame-track">
+        <div class="frame-chip st-measure"><div class="chip-top"><span class="chip-frame">f0</span><span class="chip-state">MEASURING<br>→MEASURING</span></div><dl class="chip-data"><dt>conf</dt><dd>0.689883</dd><dt>thr</dt><dd>0.6899</dd><dt>判定</dt><dd>retry 1</dd></dl></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-measure"><div class="chip-top"><span class="chip-frame">f1</span><span class="chip-state">MEASURING<br>→MOVING</span></div><dl class="chip-data"><dt>conf</dt><dd>0.690128</dd><dt>thr</dt><dd>0.6899</dd><dt>判定</dt><dd>通過</dd></dl></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-wait"><div class="chip-top"><span class="chip-frame">f2–4</span><span class="chip-state">MOVING→SETTLING<br>→VERIFYING</span></div><div class="chip-empty">— 無量測 —<br>lens 300→174</div></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-ok"><div class="chip-top"><span class="chip-frame">f5</span><span class="chip-state">VERIFYING<br>→FOCUSED</span></div><dl class="chip-data"><dt>disp</dt><dd>0.016</dd><dt>conf</dt><dd>0.915</dd><dt>lens</dt><dd>174</dd></dl></div>
+      </div>
+      <p class="scenario-note">只把 threshold 往上調了 0.00002，就從「立即通過」變成「需要 1 次 retry」——兩個相鄰浮點值間確實存在乾淨的翻轉邊界，不是量測誤差。</p>
+    </div>
+
+    <div class="scenario-block">
+      <div class="scenario-head">
+        <span class="scenario-tag">threshold = 0.691（落在雜訊帶中央，重試變賭運氣）</span>
+        <span class="scenario-result ok">✓ FOCUSED · 7 frames · 2 次 retry 後靠運氣通過</span>
+      </div>
+      <div class="frame-track">
+        <div class="frame-chip st-measure"><div class="chip-top"><span class="chip-frame">f0</span><span class="chip-state">MEASURING<br>→MEASURING</span></div><dl class="chip-data"><dt>conf</dt><dd>0.68988</dd><dt>判定</dt><dd>retry 1</dd></dl></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-measure"><div class="chip-top"><span class="chip-frame">f1</span><span class="chip-state">MEASURING<br>→MEASURING</span></div><dl class="chip-data"><dt>conf</dt><dd>0.69013</dd><dt>判定</dt><dd>retry 2</dd></dl></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-measure"><div class="chip-top"><span class="chip-frame">f2</span><span class="chip-state">MEASURING<br>→MOVING</span></div><dl class="chip-data"><dt>conf</dt><dd>0.69195</dd><dt>判定</dt><dd>通過</dd></dl></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-wait"><div class="chip-top"><span class="chip-frame">f3–5</span><span class="chip-state">MOVING→SETTLING<br>→VERIFYING</span></div><div class="chip-empty">— 無量測 —<br>lens 300→174</div></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-ok"><div class="chip-top"><span class="chip-frame">f6</span><span class="chip-state">VERIFYING<br>→FOCUSED</span></div><dl class="chip-data"><dt>disp</dt><dd>0.008</dd><dt>conf</dt><dd>0.922</dd><dt>lens</dt><dd>174</dd></dl></div>
+      </div>
+      <p class="scenario-note">前兩次量測的雜訊沒能過門檻，第 3 次剛好過（0.69195≥0.691）。因為最終被接受的是第 3 次量到的 disparity（-2.51972，非第 1 次的 -2.49746），M3 算出的 target_step 也從預設的 175 變成 174——重試不只影響「要不要繼續」，也悄悄改變了「收斂到哪」。</p>
+    </div>
+
+    <h3 style="font-family:var(--serif);font-weight:500;font-size:1.08rem;margin:2rem 0 .8rem;">max_retries 邊界</h3>
+    <div class="scenario-block">
+      <div class="scenario-head">
+        <span class="scenario-tag">max_retries = 0（threshold=0.8，恆不通過）</span>
+        <span class="scenario-result bad">✕ FAILED · 1 frame</span>
+      </div>
+      <div class="frame-track">
+        <div class="frame-chip st-fail"><div class="chip-top"><span class="chip-frame">f0</span><span class="chip-state">MEASURING<br>→FAILED</span></div><dl class="chip-data"><dt>conf</dt><dd>0.690</dd><dt>retry</dt><dd>1&gt;0</dd></dl></div>
+      </div>
+      <p class="scenario-note">第一次量測沒過，<code>retries_=1 &gt; max_retries=0</code> 立即 FAILED——不給任何重試機會。</p>
+    </div>
+
+    <div class="scenario-block">
+      <div class="scenario-head">
+        <span class="scenario-tag">max_retries = 1（threshold=0.8）</span>
+        <span class="scenario-result bad">✕ FAILED · 2 frames</span>
+      </div>
+      <div class="frame-track">
+        <div class="frame-chip st-measure"><div class="chip-top"><span class="chip-frame">f0</span><span class="chip-state">MEASURING<br>→MEASURING</span></div><dl class="chip-data"><dt>conf</dt><dd>0.690</dd><dt>retry</dt><dd>1/1</dd></dl></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-fail"><div class="chip-top"><span class="chip-frame">f1</span><span class="chip-state">MEASURING<br>→FAILED</span></div><dl class="chip-data"><dt>conf</dt><dd>0.690</dd><dt>retry</dt><dd>2&gt;1</dd></dl></div>
+      </div>
+      <p class="scenario-note">與 <code>max_retries=3</code>（原始重試路徑測試，4 frames FAILED）比對：FAILED 固定發生在第 <code>max_retries+2</code> 個 frame——0→1 frame、1→2 frames、3→4 frames，公式一致。</p>
+    </div>
+
+    <div class="scenario-block">
+      <div class="scenario-head">
+        <span class="scenario-tag">max_retries = 50（threshold=0.95，遠高於此情境可達到的 confidence）</span>
+        <span class="scenario-result bad">✕ FAILED · 51 frames</span>
+      </div>
+      <div class="frame-track" style="gap:.9rem;">
+        <div class="frame-chip st-fail" style="width:auto;padding:1rem 1.4rem;">
+          <div class="chip-top"><span class="chip-frame">51 次量測統計</span><span class="chip-state">MEASURING<br>× 51 → FAILED</span></div>
+          <dl class="chip-data" style="grid-template-columns:auto auto auto auto;gap:.3rem 1.2rem;">
+            <dt>conf min</dt><dd>0.6828</dd>
+            <dt>conf max</dt><dd>0.6989</dd>
+            <dt>conf mean</dt><dd>0.6904</dd>
+            <dt>threshold</dt><dd>0.9500</dd>
+          </dl>
+        </div>
+      </div>
+      <p class="scenario-note">即使給了 50 次重試預算，51 個樣本的 confidence 全部落在 0.68–0.70 之間，離 0.95 還差一大截——這個 cost curve 形狀（谷底深度／曲率／歧義度）由紋理與雜訊決定，不會因為多試幾次就突破分布上限。<strong>把 <code>max_retries</code> 調大並不能彌補 threshold 設定不合理</strong>，這是與前一組「in_focus_disparity 太緊撞雜訊底噪」同一類陷阱的另一種型態。</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>邊界行為測試 — <code>shift_min</code> / <code>shift_max</code> 搜尋窗邊界</h2>
+    <p class="section-sub">
+      這組參數不歸 <code>AfController</code> 管，是 M1/M2 的搜尋範圍：cost engine 只在 <code>[shift_min, shift_max]</code>
+      內取樣，M2 的谷底若落在窗口最邊緣（<code>mi==0</code> 或 <code>mi==n-1</code>），會觸發
+      <code>parabolic_depth_estimator.cpp</code> 裡的 <code>boundary</code> 分支：不做拋物線內插、confidence 直接打對折。
+    </p>
+
+    <div class="answer-panel" style="margin-bottom:1.4rem;">
+      <span class="verdict">結論</span>
+      <div>
+        <p><strong>窗口小於真實 disparity 不會讓系統壞掉，但會被 clamp 在窗緣、confidence 對折</strong>：估測值不是真值，只是「已知在這個方向、但至少這麼遠」，系統靠後續 iteration 自我修正，多花幾個 frame 才收斂到位。</p>
+        <p><strong>CLAUDE.md 標註的 aliasing 安全邊界（頻率 &lt; π/max_shift）比實測門檻保守</strong>：實測把窗口從 ±16 一路擴到 ±48（遠超安全邊界），cost curve 都只有單一極小值，沒有觀察到假極小值——原因是模擬器的離焦模糊半徑（<code>radius=min(6, defocus/25)</code>）在大位移時同時放大，高頻紋理被模糊掉，間接降低了 aliasing 風險。這是<strong>這個模擬器的隱含保護</strong>，不代表任意搜尋窗在真實系統上都安全。</p>
+        <p><strong>confidence 不是窗口大小不變量</strong>：窗口越寬，confidence 單調上升（0.690→0.717，見下表），但這不是量測變準——是 <code>depth = 1 - cmin/mean</code> 裡的 mean 被更多不匹配樣本拉高、虛高了 confidence。調 <code>shift_min/max</code> 與調 <code>confidence_threshold</code> 必須一起看，不能獨立設定。</p>
+      </div>
+    </div>
+
+    <div class="scenario-block">
+      <div class="scenario-head">
+        <span class="scenario-tag">mid · shift=[-2,2]（窗口 5 格，遠小於真實 disparity -2.5）</span>
+        <span class="scenario-result ok">✓ FOCUSED · 9 frames · 觸發 boundary clamp</span>
+      </div>
+      <div class="frame-track">
+        <div class="frame-chip st-measure"><div class="chip-top"><span class="chip-frame">f0</span><span class="chip-state">MEASURING<br>→MOVING</span></div><dl class="chip-data"><dt>disp</dt><dd>-2.000</dd><dt>gt</dt><dd>-2.500</dd><dt>conf</dt><dd>0.395</dd><dt>lens</dt><dd>300→200</dd></dl></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-wait"><div class="chip-top"><span class="chip-frame">f1–3</span><span class="chip-state">MOVING→SETTLING<br>→VERIFYING</span></div><div class="chip-empty">— 無量測 —<br>lens 300→200</div></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-measure"><div class="chip-top"><span class="chip-frame">f4</span><span class="chip-state">VERIFYING<br>→MOVING</span></div><dl class="chip-data"><dt>disp</dt><dd>-0.548</dd><dt>gt</dt><dd>-0.500</dd><dt>conf</dt><dd>0.456</dd><dt>lens</dt><dd>200→173</dd></dl></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-wait"><div class="chip-top"><span class="chip-frame">f5–7</span><span class="chip-state">MOVING→SETTLING<br>→VERIFYING</span></div><div class="chip-empty">— 無量測 —<br>lens 200→173</div></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-ok"><div class="chip-top"><span class="chip-frame">f8</span><span class="chip-state">VERIFYING<br>→FOCUSED</span></div><dl class="chip-data"><dt>disp</dt><dd>0.025</dd><dt>conf</dt><dd>0.826</dd><dt>lens</dt><dd>173</dd></dl></div>
+      </div>
+      <p class="scenario-note"><strong>f0</strong> 谷底落在窗口右緣（shift=-2 是 <code>mi==0</code>），觸發 boundary 分支，disparity 被 clamp 成整數 -2（不是 -2.5），confidence 對半砍到 0.395。第一次移動只走了 -2 個單位的修正，殘差 -0.5 留到下一輪；<strong>f4</strong> 這次殘差已經在窗口內，正常拋物線內插，confidence 回升到 0.456，兩輪之後才收斂。窗口不夠大，代價是多 4 個 frame、confidence 全程偏低。</p>
+    </div>
+
+    <div class="scenario-block">
+      <div class="scenario-head">
+        <span class="scenario-tag">far · shift=[-8,8]（窗口 17 格，真實 disparity -9.4 略超出）</span>
+        <span class="scenario-result ok">✓ FOCUSED · 9 frames · 同樣觸發 boundary clamp</span>
+      </div>
+      <div class="frame-track">
+        <div class="frame-chip st-measure"><div class="chip-top"><span class="chip-frame">f0</span><span class="chip-state">MEASURING<br>→MOVING</span></div><dl class="chip-data"><dt>disp</dt><dd>-8.000</dd><dt>gt</dt><dd>-9.400</dd><dt>conf</dt><dd>0.422</dd><dt>lens</dt><dd>600→200</dd></dl></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-wait"><div class="chip-top"><span class="chip-frame">f1–3</span><span class="chip-state">MOVING→SETTLING<br>→VERIFYING</span></div><div class="chip-empty">— 無量測 —<br>lens 600→200</div></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-measure"><div class="chip-top"><span class="chip-frame">f4</span><span class="chip-state">VERIFYING<br>→MOVING</span></div><dl class="chip-data"><dt>disp</dt><dd>-1.373</dd><dt>gt</dt><dd>-1.400</dd><dt>conf</dt><dd>0.688</dd><dt>lens</dt><dd>200→131</dd></dl></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-wait"><div class="chip-top"><span class="chip-frame">f5–7</span><span class="chip-state">MOVING→SETTLING<br>→VERIFYING</span></div><div class="chip-empty">— 無量測 —<br>lens 200→131</div></div>
+        <div class="chip-arrow">→</div>
+        <div class="frame-chip st-ok"><div class="chip-top"><span class="chip-frame">f8</span><span class="chip-state">VERIFYING<br>→FOCUSED</span></div><dl class="chip-data"><dt>disp</dt><dd>-0.008</dd><dt>conf</dt><dd>0.905</dd><dt>lens</dt><dd>131</dd></dl></div>
+      </div>
+      <p class="scenario-note">與上例同一種邊界，換到 far 情境重現：f0 clamp 在 -8，confidence 打對折到 0.422，f4 殘差 -1.4 已落在窗口內、正常內插。<strong>兩個情境的行為完全一致</strong>——boundary clamp 是搜尋窗與真實 disparity 相對大小決定的通用行為，與距離遠近無關。</p>
+    </div>
+
+    <div class="scenario-block">
+      <div class="scenario-head">
+        <span class="scenario-tag">mid · 窗口寬度掃描（f0 disparity=-2.497，在窗口內未觸發 boundary）</span>
+        <span class="scenario-result ok">confidence 隨窗口單調上升</span>
+      </div>
+      <div class="char-table-wrap">
+        <table class="char-table">
+          <thead>
+            <tr><th>shift_min / shift_max</th><th>窗口寬度</th><th>f0 disparity</th><th>f0 confidence</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="mono">±3</td><td class="mono">7 格</td><td class="mono">-2.497</td><td class="mono">0.594</td></tr>
+            <tr><td class="mono">±16（預設）</td><td class="mono">33 格</td><td class="mono">-2.497</td><td class="mono">0.690</td></tr>
+            <tr><td class="mono">±20</td><td class="mono">41 格</td><td class="mono">-2.497</td><td class="mono">0.698</td></tr>
+            <tr><td class="mono">±32</td><td class="mono">65 格</td><td class="mono">-2.497</td><td class="mono">0.711</td></tr>
+            <tr><td class="mono">±48</td><td class="mono">97 格</td><td class="mono">-2.497</td><td class="mono">0.717</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="scenario-note" style="border-top:none;padding-top:0;">量到的 disparity 完全沒變（都是同一個真值），但 confidence 從 0.594 一路爬到 0.717——單純因為窗口越寬，<code>mean</code> 被越多遠處不匹配的高 cost 樣本拉高。<strong>±48 這組還額外用 <code>--dump-costs</code> 檢查過完整 97 點 cost 曲線，全程只有一個局部極小值</strong>，證實此情境下沒有 aliasing 假極小值。</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>附件 — <code>AfController::onFrame()</code> 原始碼</h2>
+    <p class="section-sub">上方狀態轉移圖對應的實際實作：一個 switch-case 決定是否呼叫 <code>handleMeasurement()</code>（disparity search 的唯一入口）。</p>
+    <div class="appendix-card">
+      <div class="appendix-head">
+        <span class="path">src/control/af_controller.cpp</span>
+        <span class="lines">L47–L79</span>
+      </div>
+      <pre class="code-block"><code><span class="ln">47</span><span class="tp">AfFrameLog</span> AfController::onFrame(<span class="kw">const</span> AfRequest&amp;, <span class="kw">const</span> PdInput&amp; input)
+<span class="ln">48</span>{
+<span class="ln">49</span>  AfFrameLog log;
+<span class="ln">50</span>  log.frame_id = input.meta.frame_id;
+<span class="ln">51</span>  log.state_before = state_;
+<span class="ln">52</span>  log.lens_step = actuator_.getStatus().current_step;
+<span class="ln">53</span>  log.target_step = target_step_;
+<span class="ln">54</span>
+<span class="ln">55</span>  <span class="kw">switch</span> (state_)
+<span class="ln">56</span>  {
+<span class="ln">57</span>  <span class="kw">case</span> AfState::kIdle:
+<span class="ln">58</span>  <span class="kw">case</span> AfState::kFocused:
+<span class="ln">59</span>  <span class="kw">case</span> AfState::kFailed:
+<span class="ln">60</span>    <span class="kw">break</span>;
+<span class="ln">61</span>  <span class="kw">case</span> AfState::kMoving:
+<span class="ln">62</span>    state_ = AfState::kSettling;
+<span class="ln">63</span>    [[fallthrough]];
+<span class="ln">64</span>  <span class="kw">case</span> AfState::kSettling:
+<span class="ln">65</span>    <span class="kw">if</span> (!actuator_.getStatus().moving)
+<span class="ln">66</span>    {
+<span class="ln">67</span>      state_ = AfState::kVerifying;
+<span class="ln">68</span>    }
+<span class="ln">69</span>    <span class="kw">break</span>;
+<span class="ln">70</span>  <span class="kw">case</span> AfState::kMeasuring:
+<span class="ln">71</span>  <span class="kw">case</span> AfState::kVerifying:
+<span class="ln">72</span>    handleMeasurement(input, log);  <span class="cm">// disparity search 的唯一入口</span>
+<span class="ln">73</span>    <span class="kw">break</span>;
+<span class="ln">74</span>  }
+<span class="ln">75</span>
+<span class="ln">76</span>  log.state_after = state_;
+<span class="ln">77</span>  log.target_step = target_step_;
+<span class="ln">78</span>  <span class="kw">return</span> log;
+<span class="ln">79</span>}</code></pre>
+    </div>
+  </section>
+
+  <footer>
+    <span>src/control/af_controller.cpp</span>
+    <span>src/sim/sim_world.cpp</span>
+    <span>src/algo/parabolic_depth_estimator.cpp</span>
+    <span>config/{default,near,far}.json</span>
+  </footer>
+
+</div>
