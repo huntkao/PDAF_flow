@@ -196,6 +196,8 @@ void drawPlot(const CostSequence& c, const DepthEstimateTrace& t, const float* g
   if (ImPlot::BeginPlot("cost sequence", ImVec2(-1, height)))
   {
     ImPlot::SetupAxes("shift s", "SAD cost");
+    // 預設圖例貼在圖內左上角，小視窗下會蓋住曲線本體；移到圖外上緣、橫向排列
+    ImPlot::SetupLegend(ImPlotLocation_North, ImPlotLegendFlags_Outside | ImPlotLegendFlags_Horizontal);
     // basin 陰影
     if (!t.degenerate_no_samples && !t.degenerate_flat)
     {
@@ -314,7 +316,7 @@ int main(int argc, char** argv)
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-  GLFWwindow* win = glfwCreateWindow(1100, 720, "pdaf_cost_viz — M2 cost sequence", nullptr, nullptr);
+  GLFWwindow* win = glfwCreateWindow(1440, 860, "pdaf_cost_viz — M2 cost sequence", nullptr, nullptr);
   if (!win)
   {
     glfwTerminate();
@@ -325,6 +327,12 @@ int main(int argc, char** argv)
 
   float dpi_scale = 1.0f;
   glfwGetWindowContentScale(win, &dpi_scale, nullptr);
+  if (dpi_scale > 1.01f)
+  {
+    // UI（含 panel 固定寬度）依 dpi_scale 放大，但視窗本身用邏輯座標建立，
+    // 不補回同樣的倍率會讓可用空間被放大後的 UI 擠壓——這正是「每次都要手拉視窗」的根因。
+    glfwSetWindowSize(win, static_cast<int>(1440 * dpi_scale), static_cast<int>(860 * dpi_scale));
+  }
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();

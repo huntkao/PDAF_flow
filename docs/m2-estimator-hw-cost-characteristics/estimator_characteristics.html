@@ -1,6 +1,7 @@
 <title>M2 ParabolicDepthEstimator × 真實硬體 Cost 序列特性</title>
 
 <style>
+  /* 投影片固定白底單一主題：不隨 viewer 深色模式切換，確保簡報放映時背景一致 */
   :root {
     --bg: #ffffff;
     --surface: #ffffff;
@@ -61,15 +62,6 @@
   .viz-shot { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--surface-2); }
   .viz-shot img { display: block; width: 100%; height: auto; }
   .viz-shot .cap { padding: .7rem 1rem; font-family: var(--mono); font-size: .76rem; color: var(--ink-dim); border-top: 1px solid var(--line); }
-
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #10160f; --surface: #161f18; --surface-2: #1c261e;
-      --ink: #e9efe6; --ink-dim: #a3b3a5; --ink-faint: #6d7d6f;
-      --line: #2a362a; --accent: #52c98c; --accent-strong: #7ee0ab;
-      --accent-soft: rgba(82,201,140,.14); --accent-soft-2: rgba(82,201,140,.24);
-    }
-  }
 
   @media (max-width: 640px) { h1 { font-size: 1.75rem; } .page { padding: 3rem 1.1rem 4rem; } .answer-panel { grid-template-columns: 1fr; } }
 </style>
