@@ -10,6 +10,8 @@
   用高斯凹陷疊加建構 cost 曲線（固定主谷與競爭谷的深度比，只改變競爭谷數量），
   跑 python 移植版 `estimateTraced()` 算 `unamb`，再用 Monte Carlo 疊加雜訊統計 argmin 誤判率（AF hunting risk）。
 - `data/` — 產生的合成 cost 曲線 csv（`shift,cost`），供重跑或用 `pdaf_cost_viz` 檢視個別曲線形狀。
+- `tools/csv_to_dump.py` — 把 `data/*.csv` 轉成 `pdaf_cost_viz` 讀取的 `--dump-costs` JSON 格式（`frame_%04d.json`），
+  轉換後可直接用 GUI 對照不同競爭谷數量下 `count_near` 與 `unamb` 的差異。
 
 **結論**：現有 `unamb` 只取全域唯一次低點，量得到「最深的競爭者有多深」，量不到「有幾個」。
 合成實驗證明 hunting 風險隨競爭谷數量近似指數式放大，但 `unamb` 對此幾乎無感——這是待補的盲點，
