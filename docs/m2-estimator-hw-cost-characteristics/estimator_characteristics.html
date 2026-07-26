@@ -1,0 +1,203 @@
+<title>M2 ParabolicDepthEstimator × 真實硬體 Cost 序列特性</title>
+
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --surface-2: #f4f6f3;
+    --ink: #16211b;
+    --ink-dim: #5c6b60;
+    --ink-faint: #8a978c;
+    --line: #dbe3d9;
+    --accent: #1f6f52;
+    --accent-strong: #16543e;
+    --accent-soft: #e2eee5;
+    --accent-soft-2: #cfe3d5;
+    --serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  code { font-family: var(--mono); }
+  .page { max-width: 980px; margin: 0 auto; padding: 4.5rem 1.6rem 6rem; }
+
+  .eyebrow { font-family: var(--mono); font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); display: flex; align-items: center; gap: .6rem; margin-bottom: .9rem; }
+  .eyebrow::before { content: ""; width: .5rem; height: .5rem; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  h1 { font-family: var(--serif); font-weight: 500; font-size: 2.2rem; line-height: 1.22; margin: 0 0 .9rem; text-wrap: balance; letter-spacing: -.01em; max-width: 28ch; }
+  .dek { font-size: 1.06rem; color: var(--ink-dim); max-width: 68ch; margin: 0 0 3.2rem; text-wrap: pretty; }
+
+  section { margin-bottom: 3.4rem; }
+  section > h2 { font-family: var(--serif); font-weight: 500; font-size: 1.35rem; margin: 0 0 .35rem; letter-spacing: -.005em; }
+  section > h3 { font-family: var(--serif); font-weight: 500; font-size: 1.08rem; margin: 1.8rem 0 .8rem; }
+  section > .section-sub { color: var(--ink-dim); font-size: .95rem; margin: 0 0 1.4rem; max-width: 70ch; }
+
+  .answer-panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 1.5rem 1.7rem; display: grid; grid-template-columns: auto 1fr; gap: 1.1rem 1.4rem; }
+  .answer-panel .verdict { font-family: var(--mono); font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); background: var(--accent-soft); border-radius: 6px; padding: .25rem .6rem; height: fit-content; white-space: nowrap; }
+  .answer-panel p { margin: 0; }
+  .answer-panel p + p { margin-top: .7rem; }
+
+  .char-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+  table.char-table { width: 100%; border-collapse: collapse; background: var(--surface); font-size: .9rem; }
+  table.char-table th, table.char-table td { text-align: left; padding: .8rem 1rem; border-bottom: 1px solid var(--line); vertical-align: top; font-variant-numeric: tabular-nums; }
+  table.char-table thead th { font-family: var(--mono); font-size: .68rem; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-dim); background: var(--accent-soft); border-bottom: 1px solid var(--line); }
+  table.char-table tbody tr:last-child td { border-bottom: none; }
+  table.char-table td.name { font-family: var(--serif); font-weight: 500; white-space: nowrap; }
+  table.char-table td.mono { font-family: var(--mono); font-size: .84rem; }
+
+  .note { font-size: .88rem; color: var(--ink-dim); margin-top: .8rem; }
+  .note code { color: var(--accent-strong); }
+
+  .appendix-card { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .appendix-head { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: .4rem; padding: 1rem 1.3rem; border-bottom: 1px solid var(--line); background: var(--accent-soft); }
+  .appendix-head .path { font-family: var(--mono); font-size: .85rem; color: var(--accent-strong); font-weight: 600; }
+  .appendix-head .lines { font-family: var(--mono); font-size: .76rem; color: var(--ink-dim); }
+  pre.code-block { margin: 0; padding: 1.3rem 1.4rem; overflow-x: auto; background: var(--surface); }
+  pre.code-block code { font-family: var(--mono); font-size: .82rem; line-height: 1.6; color: var(--ink); white-space: pre; }
+
+  footer { border-top: 1px solid var(--line); padding-top: 1.4rem; font-family: var(--mono); font-size: .76rem; color: var(--ink-faint); display: flex; flex-wrap: wrap; gap: .5rem 1.6rem; }
+
+  /* ---- pdaf_cost_viz screenshot ---- */
+  .viz-shot { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--surface-2); }
+  .viz-shot img { display: block; width: 100%; height: auto; }
+  .viz-shot .cap { padding: .7rem 1rem; font-family: var(--mono); font-size: .76rem; color: var(--ink-dim); border-top: 1px solid var(--line); }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #10160f; --surface: #161f18; --surface-2: #1c261e;
+      --ink: #e9efe6; --ink-dim: #a3b3a5; --ink-faint: #6d7d6f;
+      --line: #2a362a; --accent: #52c98c; --accent-strong: #7ee0ab;
+      --accent-soft: rgba(82,201,140,.14); --accent-soft-2: rgba(82,201,140,.24);
+    }
+  }
+
+  @media (max-width: 640px) { h1 { font-size: 1.75rem; } .page { padding: 3rem 1.1rem 4rem; } .answer-panel { grid-template-columns: 1fr; } }
+</style>
+
+<div class="page">
+
+  <div class="eyebrow">PDAF_flow · M2 ParabolicDepthEstimator</div>
+  <h1>真實硬體 Cost 序列跑 estimateTraced() 的實測特性</h1>
+  <p class="dek">
+    與 <code>af-lifecycle-boundary</code> 無關——這裡只看 M2 演算法本身：把 8 個使用者定義 ROI、search range 65（對稱窗 ±32）
+    的真實硬體 cost 序列直接餵給生產路徑的 <code>ParabolicDepthEstimator::estimateTraced()</code>，看實際量到什麼。
+  </p>
+
+  <section>
+    <h2>資料來源</h2>
+    <p class="section-sub">
+      <code>costs/PDE/window_cost.csv</code> 與 <code>costs/PDE/window_cost21.csv</code>（gitignored，不隨 repo 分發），
+      各含 8 條序列（<code>user_0</code>~<code>user_7</code>），已用逐條拆解成
+      <code>costs/PDE/window_cost/user_N.csv</code> / <code>costs/PDE/window_cost21/user_N.csv</code>（欄位 <code>shift,cost</code>，
+      <code>shift</code> 對稱窗 -32~32）。兩個檔案裡 <code>user_1</code>~<code>user_7</code> 分別完全同值，
+      所以 16 條序列裡實際只有 4 種獨立形狀。
+    </p>
+  </section>
+
+  <section>
+    <h2>estimateTraced() 實測結果</h2>
+    <p class="section-sub">confidence 全部落在 0.06–0.31，遠低於模擬器情境的 0.69–0.92（見 <code>af-lifecycle-boundary</code>）。</p>
+    <div class="char-table-wrap">
+      <table class="char-table">
+        <thead>
+          <tr><th>序列</th><th>disparity</th><th>confidence</th><th>mi (shift)</th><th>boundary</th><th>depth</th><th>unamb</th><th>sharp</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="name">window_cost / user_0</td><td class="mono">0.0997</td><td class="mono">0.156</td><td class="mono">0</td><td class="mono">no</td><td class="mono">0.879</td><td class="mono">0.222</td><td class="mono">0.604</td></tr>
+          <tr><td class="name">window_cost / user_1~7</td><td class="mono">0.4225</td><td class="mono">0.216</td><td class="mono">0</td><td class="mono">no</td><td class="mono">0.688</td><td class="mono">0.539</td><td class="mono">0.167</td></tr>
+          <tr><td class="name">window_cost21 / user_0</td><td class="mono">0.8534</td><td class="mono">0.057</td><td class="mono">+1</td><td class="mono">no</td><td class="mono">0.753</td><td class="mono">0.110</td><td class="mono">0.363</td></tr>
+          <tr><td class="name">window_cost21 / user_1~7</td><td class="mono">0.7614</td><td class="mono">0.310</td><td class="mono">+1</td><td class="mono">no</td><td class="mono">0.733</td><td class="mono">0.693</td><td class="mono">0.219</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">四條都沒有落在窗口邊界（<code>boundary=no</code>），<code>depth</code>（谷底相對深度）其實都不差（0.69~0.88），但 <code>unamb</code>（次谷歧義度）普遍偏低——confidence 被壓低的主因不是「谷不夠深」，是「窗口內另外還有夠深的競爭谷」。</p>
+  </section>
+
+  <section>
+    <h2>Cost 曲線視覺化 — 直接沿用 <code>pdaf_cost_viz</code></h2>
+    <p class="section-sub">
+      不必另外刻圖表：<code>pdaf_cost_viz</code>（<code>tools/cost_viz/main.cpp</code>）本來就是為了視覺化任意 cost 序列而寫的，
+      只要把資料包成它讀取的 <code>--dump-costs</code> JSON schema，就能直接開來看，完全不用改動任何專案原始碼。
+    </p>
+    <div class="viz-shot">
+      <img src="assets/pdaf_cost_viz_screenshot.png" alt="pdaf_cost_viz 讀取 window_cost.csv 轉出的 dump，顯示 frame 0 / ROI 0（user_0）的 cost 曲線、basin、parabola fit 與 disparity 估計">
+      <div class="cap">實際截圖 — 開啟 <code>costs/PDE/dump</code>（由 <code>window_cost.csv</code> 轉出）：frame 0 / ROI 0 = <code>user_0</code>，disparity=0.0997、confidence=0.1561，與 <code>estimateTraced()</code> 表格數字一致。</div>
+    </div>
+    <h3>怎麼做</h3>
+    <p class="section-sub" style="margin-bottom:.6rem;">
+      <code>pdaf_cost_viz</code> 需要的 JSON 欄位（<code>tools/cost_viz/main.cpp</code> L56–90）：<code>meta.{frame_id,timestamp_ms,lens_step_at_exposure}</code>、
+      <code>hw_costs[].{shift_min,costs,valid_samples}</code>（每個 ROI 一筆）、<code>ground_truth_disparity</code>（選填，硬體資料沒有就省略）。
+      用下面的轉換 script 把 <code>window_cost*.csv</code> 包成這個格式即可：
+    </p>
+    <div class="appendix-card">
+      <div class="appendix-head">
+        <span class="path">docs/m2-estimator-hw-cost-characteristics/tools/csv_to_dump.py</span>
+      </div>
+      <pre class="code-block"><code>cmake --preset default -DPDAF_BUILD_GUI=ON && cmake --build --preset default
+
+python3 docs/m2-estimator-hw-cost-characteristics/tools/csv_to_dump.py \
+    costs/PDE/dump costs/PDE/window_cost.csv costs/PDE/window_cost21.csv
+
+./build/tools/pdaf_cost_viz costs/PDE/dump   # frame 滑桿切 window_cost/window_cost21，ROI 滑桿切 user_0~7</code></pre>
+    </div>
+  </section>
+
+  <section>
+    <h2>週期性競爭谷：真實資料的 aliasing 現象</h2>
+    <p class="section-sub">逐一列出每條序列在 ±32 窗口內的所有局部極小值，位置呈明顯等間隔。</p>
+    <div class="char-table-wrap">
+      <table class="char-table">
+        <thead>
+          <tr><th>序列</th><th>局部極小值位置（shift）</th><th>間距</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="name">window_cost / user_0</td><td class="mono">-17, 0, 17</td><td class="mono">~17</td></tr>
+          <tr><td class="name">window_cost / user_1~7</td><td class="mono">-28, -14, 0, 14, 29</td><td class="mono">~14</td></tr>
+          <tr><td class="name">window_cost21 / user_0</td><td class="mono">-29, -14, 1, 16, 30</td><td class="mono">~15</td></tr>
+          <tr><td class="name">window_cost21 / user_1~7</td><td class="mono">-26, -13, 1, 14, 28</td><td class="mono">~14</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="answer-panel" style="margin-top:1.2rem;">
+      <span class="verdict">結論</span>
+      <div>
+        <p>四條序列都在 ±32 的搜尋窗內出現等間隔（~14–17 samples）的多個局部極小值——這與 <code>CLAUDE.md</code> 裡「紋理頻率需低於 π/max_shift」的 aliasing 警告是同一件事，差別是<strong>這次是在真實硬體資料上實測到，不是模擬器裡的理論推演</strong>：模擬器刻意把紋理頻率壓在安全邊界下（且離焦模糊會進一步抑制高頻），所以幾乎不會出現這種多谷結構；真實 ROI 內的重複紋理／週期結構顯然沒有這層保護。</p>
+        <p><code>unamb</code> 正是為了偵測這種情況設計的（見 <code>parabolic_depth_estimator.cpp</code> 的次低點檢查邏輯）——它在這 4 條真實資料上確實發揮作用，把 confidence 從單看 <code>depth</code> 會有的 0.69~0.88，壓低到反映真實不確定性的 0.06~0.31。</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>附件 — 小工具</h2>
+    <p class="section-sub">兩個 standalone 工具，都不掛進專案的 CMake build。</p>
+    <div class="appendix-card">
+      <div class="appendix-head">
+        <span class="path">docs/m2-estimator-hw-cost-characteristics/tools/run_estimate.cpp</span>
+        <span class="lines">文字結果，重現上面的表格</span>
+      </div>
+      <pre class="code-block"><code>g++ -std=c++17 -O2 -Iinclude -Isrc \
+    docs/m2-estimator-hw-cost-characteristics/tools/run_estimate.cpp \
+    src/algo/parabolic_depth_estimator.cpp \
+    -o run_estimate
+
+./run_estimate costs/PDE/window_cost/user_*.csv costs/PDE/window_cost21/user_*.csv</code></pre>
+    </div>
+    <div class="appendix-card" style="margin-top:1rem;">
+      <div class="appendix-head">
+        <span class="path">docs/m2-estimator-hw-cost-characteristics/tools/csv_to_dump.py</span>
+        <span class="lines">互動視覺化，餵給 pdaf_cost_viz</span>
+      </div>
+      <pre class="code-block"><code>python3 docs/m2-estimator-hw-cost-characteristics/tools/csv_to_dump.py \
+    costs/PDE/dump costs/PDE/window_cost.csv costs/PDE/window_cost21.csv
+
+./build/tools/pdaf_cost_viz costs/PDE/dump</code></pre>
+    </div>
+  </section>
+
+  <footer>
+    <span>src/algo/parabolic_depth_estimator.cpp</span>
+    <span>tools/cost_viz/main.cpp</span>
+    <span>costs/PDE/（gitignored，硬體實測資料）</span>
+  </footer>
+
+</div>
