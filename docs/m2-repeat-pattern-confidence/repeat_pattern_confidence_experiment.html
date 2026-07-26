@@ -1,0 +1,228 @@
+<title>M2 Repeat Pattern 信心盲點 — 合成資料推演</title>
+
+<style>
+  /* 投影片固定白底單一主題：不隨 viewer 深色模式切換，確保簡報放映時背景一致 */
+  :root {
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --surface-2: #f4f6f3;
+    --ink: #16211b;
+    --ink-dim: #5c6b60;
+    --ink-faint: #8a978c;
+    --line: #dbe3d9;
+    --accent: #1f6f52;
+    --accent-strong: #16543e;
+    --accent-soft: #e2eee5;
+    --accent-soft-2: #cfe3d5;
+    --warn: #9a5a1f;
+    --warn-soft: #f4e6d6;
+    --serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  code { font-family: var(--mono); }
+  .page { max-width: 980px; margin: 0 auto; padding: 4.5rem 1.6rem 6rem; }
+
+  .eyebrow { font-family: var(--mono); font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); display: flex; align-items: center; gap: .6rem; margin-bottom: .9rem; }
+  .eyebrow::before { content: ""; width: .5rem; height: .5rem; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  h1 { font-family: var(--serif); font-weight: 500; font-size: 2.2rem; line-height: 1.22; margin: 0 0 .9rem; text-wrap: balance; letter-spacing: -.01em; max-width: 30ch; }
+  .dek { font-size: 1.06rem; color: var(--ink-dim); max-width: 68ch; margin: 0 0 3.2rem; text-wrap: pretty; }
+
+  section { margin-bottom: 3.4rem; }
+  section > h2 { font-family: var(--serif); font-weight: 500; font-size: 1.35rem; margin: 0 0 .35rem; letter-spacing: -.005em; }
+  section > h3 { font-family: var(--serif); font-weight: 500; font-size: 1.08rem; margin: 1.8rem 0 .8rem; }
+  section > .section-sub { color: var(--ink-dim); font-size: .95rem; margin: 0 0 1.4rem; max-width: 70ch; }
+
+  .answer-panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 1.5rem 1.7rem; display: grid; grid-template-columns: auto 1fr; gap: 1.1rem 1.4rem; }
+  .answer-panel .verdict { font-family: var(--mono); font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); background: var(--accent-soft); border-radius: 6px; padding: .25rem .6rem; height: fit-content; white-space: nowrap; }
+  .answer-panel.warn .verdict { color: var(--warn); background: var(--warn-soft); }
+  .answer-panel p { margin: 0; }
+  .answer-panel p + p { margin-top: .7rem; }
+
+  .char-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+  table.char-table { width: 100%; border-collapse: collapse; background: var(--surface); font-size: .9rem; }
+  table.char-table th, table.char-table td { text-align: left; padding: .8rem 1rem; border-bottom: 1px solid var(--line); vertical-align: top; font-variant-numeric: tabular-nums; }
+  table.char-table thead th { font-family: var(--mono); font-size: .68rem; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-dim); background: var(--accent-soft); border-bottom: 1px solid var(--line); }
+  table.char-table tbody tr:last-child td { border-bottom: none; }
+  table.char-table td.name { font-family: var(--serif); font-weight: 500; white-space: nowrap; }
+  table.char-table td.mono { font-family: var(--mono); font-size: .84rem; }
+  table.char-table td.hl { color: var(--warn); font-weight: 600; }
+  table.char-table tr.group-sep td { border-top: 2px solid var(--line); }
+
+  .note { font-size: .88rem; color: var(--ink-dim); margin-top: .8rem; }
+  .note code { color: var(--accent-strong); }
+
+  .step-list { counter-reset: step; list-style: none; margin: 0; padding: 0; display: grid; gap: .9rem; }
+  .step-list li { position: relative; padding-left: 2.6rem; }
+  .step-list li::before { counter-increment: step; content: counter(step); position: absolute; left: 0; top: 0; width: 1.8rem; height: 1.8rem; border-radius: 50%; background: var(--accent-soft); color: var(--accent-strong); font-family: var(--mono); font-size: .8rem; display: flex; align-items: center; justify-content: center; font-weight: 600; }
+  .step-list b { font-weight: 600; }
+
+  pre.code-block { margin: 0; padding: 1.1rem 1.3rem; overflow-x: auto; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; }
+  pre.code-block code { font-family: var(--mono); font-size: .82rem; line-height: 1.6; color: var(--ink); white-space: pre; }
+
+  footer { border-top: 1px solid var(--line); padding-top: 1.4rem; font-family: var(--mono); font-size: .76rem; color: var(--ink-faint); display: flex; flex-wrap: wrap; gap: .5rem 1.6rem; }
+
+  @media (max-width: 640px) { h1 { font-size: 1.75rem; } .page { padding: 3rem 1.1rem 4rem; } .answer-panel { grid-template-columns: 1fr; } }
+</style>
+
+<div class="page">
+
+  <div class="eyebrow">PDAF_flow · M2 ParabolicDepthEstimator</div>
+  <h1>Repeat Pattern 下的信心盲點 — 合成資料推演</h1>
+  <p class="dek">
+    延續 <code>m2-estimator-hw-cost-characteristics</code>（真實硬體 cost 序列分析），但這裡不是量測，是<strong>推演</strong>：
+    真實硬體那批資料剛好沒有出現「多個競爭谷同時逼近主谷」的情境，所以看不出問題。
+    這裡改用<strong>自製合成 cost 曲線</strong>，把「有幾個競爭谷」這個變數單獨拉出來測試，
+    確認現有 <code>unamb</code> 指標對 repeat pattern 場景（週期性重複紋理造成多個近乎打平的候選谷）有沒有真正的盲點。
+  </p>
+
+  <section>
+    <h2>背景：為什麼現有 unamb 可能不夠</h2>
+    <p class="section-sub">
+      <code>ParabolicDepthEstimator::estimateTraced()</code>（<code>src/algo/parabolic_depth_estimator.cpp</code>）目前用單一次低點衡量歧義：
+    </p>
+    <pre class="code-block"><code>// basin 外唯一一個全域次低點，跟主谷深度比
+t.unamb = (t.second - t.cmin) / depth_abs;</code></pre>
+    <p class="note">
+      這是 stereo/PDAF confidence 常見的 PKRN（peak-to-second-peak ratio）家族做法，對「單一孤立假谷」（雜訊、局部遮蔽）有效。
+      但 repeat pattern 的訊號特徵不是「一個次低點」，而是<strong>多個等距、深度相近的谷</strong>——這正是本專案 <code>CLAUDE.md</code>
+      已記錄的 aliasing 根因（紋理頻率超過 π/max_shift）。<code>unamb</code> 只取全域最低的那一個競爭者，
+      不管背後還有幾個一樣深的谷排在後面。
+    </p>
+  </section>
+
+  <section>
+    <h2>實驗設計</h2>
+    <p class="section-sub">用合成資料把「深度比」跟「競爭谷數量」兩個變數解耦，分別測試。</p>
+    <ol class="step-list">
+      <li><b>固定深度比 r</b>——主谷與最接近的競爭谷的 cost 比值（1.05 / 1.15 / 1.30 / 1.60，r 越接近 1 越危險）。</li>
+      <li><b>只改變競爭谷數量</b>——1 個 / 2 個 / 4 個，全部設在同一個深度比 r 上，週期 13（間距遠大於谷寬 σ=2.5，
+        避免跟主谷高斯重疊，也避開邊界 index 0/64，確保每個谷都是乾淨獨立的局部極小值）。</li>
+      <li><b>無雜訊時跑 <code>estimateTraced()</code></b>——驗證假設：因為 <code>unamb</code> 只取全域最低競爭者，
+        同一個 r 底下不管幾個競爭谷，<code>unamb</code> 應該幾乎不變。</li>
+      <li><b>疊加高斯雜訊做 Monte Carlo</b>（雜訊標準差 = 主谷深度的 10%，2000 次試驗／情境），
+        統計 argmin 落在「非主谷」的機率——這是模擬 frame-to-frame 量測雜訊下真正的 <b>AF hunting 風險</b>，
+        也是 confidence 這個數字理論上該預測的東西。</li>
+      <li><b>跟真正的 C++ 生產路徑交叉驗證</b>——python 移植版的 <code>unamb</code> 數字對照
+        <code>run_estimate</code>（直接連結 <code>src/algo/parabolic_depth_estimator.cpp</code>）的輸出，逐條核對到小數點後三位。</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>結果</h2>
+    <div class="char-table-wrap">
+      <table class="char-table">
+        <thead>
+          <tr><th>r</th><th>情境</th><th>unamb</th><th>hunting rate（2000 次 MC）</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="mono">1.05</td><td>1 個競爭谷</td><td class="mono">0.059</td><td class="mono">0.330</td></tr>
+          <tr><td class="mono">1.05</td><td>2 個（週期性）</td><td class="mono">0.066</td><td class="mono">0.496</td></tr>
+          <tr class="group-sep"><td class="mono">1.05</td><td>4 個（週期性）</td><td class="mono">0.089</td><td class="mono hl">0.635</td></tr>
+          <tr><td class="mono">1.15</td><td>1 個競爭谷</td><td class="mono">0.159</td><td class="mono">0.124</td></tr>
+          <tr><td class="mono">1.15</td><td>2 個（週期性）</td><td class="mono">0.177</td><td class="mono">0.195</td></tr>
+          <tr class="group-sep"><td class="mono">1.15</td><td>4 個（週期性）</td><td class="mono">0.229</td><td class="mono hl">0.315</td></tr>
+          <tr><td class="mono">1.30</td><td>1 個競爭谷</td><td class="mono">0.278</td><td class="mono">0.021</td></tr>
+          <tr><td class="mono">1.30</td><td>2 個（週期性）</td><td class="mono">0.306</td><td class="mono">0.036</td></tr>
+          <tr class="group-sep"><td class="mono">1.30</td><td>4 個（週期性）</td><td class="mono">0.380</td><td class="mono">0.070</td></tr>
+          <tr><td class="mono">1.60</td><td>1 個競爭谷</td><td class="mono">0.445</td><td class="mono">0.001</td></tr>
+          <tr><td class="mono">1.60</td><td>2 個（週期性）</td><td class="mono">0.479</td><td class="mono">0.001</td></tr>
+          <tr class="group-sep"><td class="mono">1.60</td><td>4 個（週期性）</td><td class="mono">0.566</td><td class="mono">0.003</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">
+      交叉驗證（r=1.05，前三條，<code>run_estimate</code> 輸出的 <code>unamb</code> 欄）：
+      <code>0.0587 / 0.0661 / 0.0887</code>——與 python 移植版 <code>0.059 / 0.066 / 0.089</code> 一致，
+      確認合成實驗用的公式精確對齊生產路徑 <code>estimateTraced()</code>。
+    </p>
+  </section>
+
+  <section>
+    <h2>發現：unamb 量不到「數量」，只量得到「最深的那一個」</h2>
+    <div class="answer-panel warn">
+      <span class="verdict">盲點確認</span>
+      <div>
+        <p>
+          r=1.05 時，<code>unamb</code> 從 1 個競爭谷的 0.059 只爬到 4 個競爭谷的 0.089（+50%），
+          但實測 hunting 機率從 0.330 飆到 0.635（+92%，接近翻倍）。<code>unamb</code> 的變化幅度遠遠跟不上真實風險的變化幅度。
+        </p>
+        <p>
+          上一輪曾經提過「多競爭者深度聚合」（例如對多個近乎打平的谷深度取調和平均）作為候選方案，
+          但這裡的合成設計刻意讓所有競爭谷深度比相同，調和平均自然趨近單一值——<strong>深度聚合抓不到「數量」這個維度</strong>，
+          因為 hunting 風險的物理機制不是深度平均，而是「多次獨立雜訊試驗，只要有一次雜訊讓某個競爭谷贏過主谷就算輸」，
+          這是組合機率問題，不是深度問題。
+        </p>
+      </div>
+    </div>
+
+    <h3>用簡化的組合機率模型驗證方向</h3>
+    <p class="section-sub">
+      把 k 個競爭谷當作 k 次「各自獨立、各有 p₁ 機率單獨打敗主谷」的嘗試（p₁ 取自同一個 r 下「1 個競爭谷」情境的實測 hunting rate），
+      預測值 = <code>1 - (1 - p₁)^k</code>：
+    </p>
+    <div class="char-table-wrap">
+      <table class="char-table">
+        <thead><tr><th>r</th><th>k</th><th>實測 hunting rate</th><th>預測 1-(1-p₁)^k</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">1.05</td><td class="mono">1</td><td class="mono">0.330</td><td class="mono">0.330</td></tr>
+          <tr><td class="mono">1.05</td><td class="mono">2</td><td class="mono">0.496</td><td class="mono">0.551</td></tr>
+          <tr><td class="mono">1.05</td><td class="mono">4</td><td class="mono">0.635</td><td class="mono">0.798</td></tr>
+          <tr><td class="mono">1.15</td><td class="mono">2</td><td class="mono">0.195</td><td class="mono">0.233</td></tr>
+          <tr><td class="mono">1.15</td><td class="mono">4</td><td class="mono">0.315</td><td class="mono">0.411</td></tr>
+          <tr><td class="mono">1.30</td><td class="mono">2</td><td class="mono">0.036</td><td class="mono">0.042</td></tr>
+          <tr><td class="mono">1.30</td><td class="mono">4</td><td class="mono">0.070</td><td class="mono">0.081</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">
+      獨立性假設不精確（同一條曲線上的雜訊擾動彼此並非完全獨立，尤其相鄰谷共用局部斜率），導致模型系統性高估，
+      但方向與量級都吻合：<b>hunting 風險隨競爭谷數量近似指數式放大</b>，這是現有單點式 <code>unamb</code> 完全沒有建模的變數。
+    </p>
+  </section>
+
+  <section>
+    <h2>結論與後續</h2>
+    <div class="answer-panel">
+      <span class="verdict">建議</span>
+      <div>
+        <p>
+          不建議再往「深度聚合」方向修 <code>unamb</code>——本實驗已證明那條路線在數量效應上是無效的。
+          應該直接把「有幾個近乎打平的競爭谷」當成獨立訊號輸出，例如在 <code>DepthEstimateTrace</code>／<code>DepthEstimate</code>
+          新增一個 <code>count_near</code>（basin 外、深度落在容忍帶內的局部極小值個數），
+          交給下游（<code>AfController</code> 或未來的仲裁層）套用組合機率式的策略（例如 <code>count_near ≥ 2</code> 時
+          強制走保守分支、降低 <code>max_retries</code>、或改變重試策略），而不是硬塞進單一 <code>confidence</code> scalar
+          ——這維持 M2（純量測）與仲裁邏輯分離的架構分工。
+        </p>
+        <p>
+          <b>這篇只做到分析與量化，尚未動手實作。</b><code>count_near</code> 欄位與下游策略留待後續實作階段再進行。
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>重現實驗</h2>
+    <pre class="code-block"><code># 產生合成資料 + 統計結果（純 python，不需要建置專案）
+python3 docs/m2-repeat-pattern-confidence/tools/synth_repeat_pattern_experiment.py \
+    docs/m2-repeat-pattern-confidence/data
+
+# 額外做 C++ 生產路徑交叉驗證（需要先建置 run_estimate，見
+# docs/m2-estimator-hw-cost-characteristics/README.md）：
+g++ -std=c++17 -O2 -Iinclude -Isrc \
+    docs/m2-estimator-hw-cost-characteristics/tools/run_estimate.cpp \
+    src/algo/parabolic_depth_estimator.cpp -o /tmp/run_estimate
+
+python3 docs/m2-repeat-pattern-confidence/tools/synth_repeat_pattern_experiment.py \
+    docs/m2-repeat-pattern-confidence/data --run-estimate /tmp/run_estimate</code></pre>
+  </section>
+
+  <footer>
+    <span>PDAF_flow</span>
+    <span>docs/m2-repeat-pattern-confidence/</span>
+    <span>合成資料推演，非真實硬體量測</span>
+  </footer>
+
+</div>
