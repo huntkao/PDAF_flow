@@ -235,13 +235,35 @@ DepthEstimate estimate(const CostSequence&amp; cost){
       </div>
     </section>
 
+    <!-- 8 count_near 開發脈絡 -->
+    <section class="slide">
+      <p class="kicker">count_near · 開發脈絡</p>
+      <h2>unamb 量不到「有幾個」，hunting 風險卻隨數量近似指數放大</h2>
+      <p class="lede">真實硬體 cost 資料剛好沒出現多個競爭谷同時逼近主谷的情境，看不出問題；改用合成 cost 曲線固定深度比 r，只改變週期性競爭谷數量（1/2/4），對照 <code class="inl">estimateTraced()</code> 算出的 unamb，與疊加雜訊 Monte Carlo 模擬出的 argmin 誤判率（AF hunting risk）。</p>
+      <div class="row">
+        <div class="col" style="flex:1.3;">
+          <div class="plotwrap"><svg id="p8" viewBox="0 0 720 300"></svg></div>
+        </div>
+        <div class="col">
+          <ul class="pts">
+            <li><b>r=1.05</b>：unamb 0.059→0.089（<b>+50%</b>），hunting rate 0.330→0.635（<b class="e">+92%</b>）——風險漲幅遠超 unamb</li>
+            <li class="e">組合機率模型 <code class="inl">1−(1−p₁)^k</code> 方向、量級都吻合：風險隨競爭谷數量<b>近似指數式放大</b></li>
+            <li class="m">深度聚合（調和平均等）抓不到「數量」——hunting 是「k 次獨立雜訊，任一次翻盤就算輸」的組合機率問題，不是深度平均問題</li>
+            <li><b>count_near</b>：basin 外、深度落在 second 10% 容忍帶內的局部極小值個數，純診斷欄位，尚未接入 confidence 或 <code class="inl">AfController</code> 仲裁</li>
+            <li>真實硬體 <code class="inl">window_cost21.csv</code> 也抓到一個 <b>count_near=2</b> 的真實案例：兩個競爭谷深度相近，而 unamb=0.693 仍判定「不太模糊」——盲點不只存在於合成資料</li>
+          </ul>
+        </div>
+      </div>
+      <p class="cap">推演：<code class="inl">docs/m2-repeat-pattern-confidence/</code>；實作＋單元測試：<code class="inl">src/algo/parabolic_depth_estimator.{h,cpp}</code>；真實硬體交叉驗證：<code class="inl">scripts/check_count_near_hw.sh</code>。</p>
+    </section>
+
   </div>
 
   <div class="bar">
     <div class="dots" id="dots"></div>
     <div class="nav">
       <button id="prev" aria-label="上一張">← 上一張</button>
-      <span class="count" id="count">1 / 7</span>
+      <span class="count" id="count">1 / 8</span>
       <button id="next" aria-label="下一張">下一張 →</button>
     </div>
   </div>
@@ -376,6 +398,22 @@ function draw(){
     curve(svg,XS.map(s=>[s,0.28+0.006*Math.sin(s*1.3)]),sx,sy,C('--mag'),2.5);
     dots(svg,XS,ys,sx,sy,C('--mag'),4);
     label(svg,sx(0),sy(0.28)+26,'無谷 → invalid',C('--mag'),'middle',680,12);
+  })();
+
+  // 8 — count_near 開發脈絡：unamb 幾乎不變 vs hunting rate 近似指數放大（r=1.05）
+  (()=>{const svg=document.getElementById('p8'); if(!svg)return; svg.innerHTML='';
+    const {sx,sy}=frame(svg,{x0:-0.3,x1:2.3,y0v:0,y1v:0.7,px:56,py:20,pw:580,ph:230,ylab:'0–1',xticks:[],nogrid:true});
+    const xs=[0,1,2], klabel=['1 個','2 個（週期）','4 個（週期）'];
+    const unamb=[0.059,0.066,0.089], hunting=[0.330,0.496,0.635];
+    [0.2,0.4,0.6].forEach(y=>svg.appendChild(E("line",{x1:sx(-0.3),y1:sy(y),x2:sx(2.3),y2:sy(y),stroke:C('--grid'),'stroke-width':1})));
+    curve(svg,xs.map((x,i)=>[x,unamb[i]]),sx,sy,C('--blue'),2.5);
+    dots(svg,xs,unamb,sx,sy,C('--blue'),5.5);
+    curve(svg,xs.map((x,i)=>[x,hunting[i]]),sx,sy,C('--emph'),2.5);
+    dots(svg,xs,hunting,sx,sy,C('--emph'),5.5);
+    xs.forEach((x,i)=>label(svg,sx(x),sy(0)+26,klabel[i],C('--muted'),'middle',600,12));
+    label(svg,sx(2)+14,sy(unamb[2]),'unamb +50%',C('--blue'),'start',700,12.5);
+    label(svg,sx(2)+14,sy(hunting[2])-2,'hunting +92%',C('--emph'),'start',700,12.5);
+    label(svg,sx(-0.3),sy(0.7)-6,'r = 1.05（越接近 1 越危險）',C('--muted'),'start',600,12);
   })();
 }
 
