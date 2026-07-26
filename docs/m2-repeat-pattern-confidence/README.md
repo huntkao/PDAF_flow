@@ -12,6 +12,11 @@
 - `data/` — 產生的合成 cost 曲線 csv（`shift,cost`），供重跑或用 `pdaf_cost_viz` 檢視個別曲線形狀。
 - `tools/csv_to_dump.py` — 把 `data/*.csv` 轉成 `pdaf_cost_viz` 讀取的 `--dump-costs` JSON 格式（`frame_%04d.json`），
   轉換後可直接用 GUI 對照不同競爭谷數量下 `count_near` 與 `unamb` 的差異。
+- `data/dump_r1.15/` — 上面轉檔工具的產出範例，固定 `r=1.15` 這組深度比，`frame_0000/0001/0002.json`
+  依序對應 `synth_1_competitor_r1.15.csv` / `synth_2_competitors_periodic_r1.15.csv` /
+  `synth_4_competitors_periodic_r1.15.csv`（1/2/4 個競爭谷）。已用 `pdaf_cost_viz data/dump_r1.15` 實際開過驗證，
+  三個 frame 的 `unamb` / `count_near` 分別是 0.159/1、0.177/2、0.229/4——`unamb` 隨數量幾乎沒有明顯變化，
+  `count_near` 則正確反映競爭谷個數，圖上橘色圈的「near competitors」標記數量也跟著吻合。
 
 **結論**：現有 `unamb` 只取全域唯一次低點，量得到「最深的競爭者有多深」，量不到「有幾個」。
 合成實驗證明 hunting 風險隨競爭谷數量近似指數式放大，但 `unamb` 對此幾乎無感——這是待補的盲點，
