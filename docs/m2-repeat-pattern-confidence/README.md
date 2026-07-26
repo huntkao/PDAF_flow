@@ -13,8 +13,14 @@
 
 **結論**：現有 `unamb` 只取全域唯一次低點，量得到「最深的競爭者有多深」，量不到「有幾個」。
 合成實驗證明 hunting 風險隨競爭谷數量近似指數式放大，但 `unamb` 對此幾乎無感——這是待補的盲點，
-建議之後在 `DepthEstimateTrace`/`DepthEstimate` 新增獨立的 `count_near` 欄位交給下游仲裁策略使用，
-而不是塞進單一 `confidence` scalar。**本篇僅完成分析，`count_near` 尚未實作。**
+建議新增獨立的 `count_near` 欄位交給下游仲裁策略使用，而不是塞進單一 `confidence` scalar。
+
+**目前狀態**：`count_near` 已實作於 `DepthEstimateTrace`（`src/algo/parabolic_depth_estimator.{h,cpp}`），
+定義為 basin 外、深度落在 `second`（現有次低點）10% 容忍帶內的局部極小值個數，純診斷欄位，
+`estimate()`/`confidence` 公式與 `DepthEstimate` 公開介面都尚未改動。單元測試見
+`tests/test_depth_estimator.cpp`（`DepthEstimatorTrace.CountNear*`），其中
+`CountNearCountsMultipleNearTiedCompetitors` 用「unamb 完全相同、count_near 不同」的一組配平範例
+直接示範現有 `unamb` 的盲點。**是否要接入 confidence 公式或 `AfController` 仲裁策略，留待後續評估。**
 
 ## 重現實驗
 

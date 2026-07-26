@@ -145,6 +145,36 @@ TEST(DepthEstimatorTrace, GoldenBimodalBasinAndSecond)
   EXPECT_LT(t.result.confidence, 0.15f);
 }
 
+TEST(DepthEstimatorTrace, CountNearIgnoresSingleDistantCompetitor)
+{
+  // 唯一競爭谷（second=1.2）跟主谷差很遠，落在容忍帶內的只有它自己
+  auto t = ParabolicDepthEstimator{}.estimateTraced(makeCost(-4, {8, 1.2f, 8, 3, 1, 3, 8, 8, 8}));
+  EXPECT_FLOAT_EQ(t.second, 1.2f);
+  EXPECT_EQ(t.count_near, 1);
+}
+
+TEST(DepthEstimatorTrace, CountNearCountsMultipleNearTiedCompetitors)
+{
+  // 兩個競爭谷都跟 second 相近（1.2 vs 1.25，在 10% 容忍帶內）：
+  // unamb 只看 second=1.2，量不到「其實還有第二個一樣深的谷」；count_near 應為 2。
+  auto t = ParabolicDepthEstimator{}.estimateTraced(makeCost(-4, {8, 1.2f, 8, 3, 1, 3, 8, 1.25f, 8}));
+  EXPECT_FLOAT_EQ(t.second, 1.2f);
+  EXPECT_EQ(t.count_near, 2);
+
+  // 對照組：second 相同（1.2）、mean 也刻意配平（首項 6.25 補償），但第二個競爭谷
+  // 深度遠離容忍帶（3.0 >> 1.2*1.1）
+  auto distant = ParabolicDepthEstimator{}.estimateTraced(makeCost(-4, {6.25f, 1.2f, 8, 3, 1, 3, 8, 3.f, 8}));
+  EXPECT_FLOAT_EQ(distant.unamb, t.unamb); // 兩者 unamb 完全相同——盲點所在
+  EXPECT_EQ(distant.count_near, 1);        // 但 count_near 正確分辨出差異
+}
+
+TEST(DepthEstimatorTrace, CountNearZeroWhenNoCompetitor)
+{
+  auto t = ParabolicDepthEstimator{}.estimateTraced(makeCost(-4, {8, 6, 4, 2, 1, 0.2f, 1, 2, 4}));
+  EXPECT_TRUE(std::isinf(t.second));
+  EXPECT_EQ(t.count_near, 0);
+}
+
 TEST(DepthEstimatorTrace, DegenerateFlagsSet)
 {
   auto ns = ParabolicDepthEstimator{}.estimateTraced(makeCost(-4, {1, 2, 3, 4, 5, 6, 7, 8, 9}, 0));

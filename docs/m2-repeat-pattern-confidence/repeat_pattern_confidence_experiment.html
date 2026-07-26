@@ -197,7 +197,12 @@ t.unamb = (t.second - t.cmin) / depth_abs;</code></pre>
           ——這維持 M2（純量測）與仲裁邏輯分離的架構分工。
         </p>
         <p>
-          <b>這篇只做到分析與量化，尚未動手實作。</b><code>count_near</code> 欄位與下游策略留待後續實作階段再進行。
+          <b>更新：<code>count_near</code> 已實作</b>——落在 <code>DepthEstimateTrace</code>（<code>src/algo/parabolic_depth_estimator.{h,cpp}</code>），
+          定義為 basin 外、深度落在 <code>second</code> 10% 容忍帶內的局部極小值個數，純診斷欄位，
+          <code>estimate()</code>/<code>confidence</code> 公式與 <code>DepthEstimate</code> 公開介面都尚未改動。
+          單元測試（<code>tests/test_depth_estimator.cpp</code>，<code>DepthEstimatorTrace.CountNear*</code>）用一組
+          mean 配平的範例直接證明「unamb 完全相同、count_near 不同」的盲點確實存在於生產路徑上。
+          是否接入 confidence 公式或 <code>AfController</code> 仲裁策略，留待後續評估。
         </p>
       </div>
     </div>

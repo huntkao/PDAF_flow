@@ -57,6 +57,25 @@ DepthEstimateTrace ParabolicDepthEstimator::estimateTraced(const CostSequence& c
                 ? 1.f
                 : std::clamp((t.second - t.cmin) / depth_abs, 0.f, 1.f);
 
+  // count_near：basin 外的局部極小值裡，有幾個落在 second 的 10% 容忍帶內
+  // （容忍帶用相對值，跟 depth 正規化一樣對場景對比尺度不變）
+  if (!std::isinf(t.second))
+  {
+    constexpr float kCountNearTolerance = 0.10f;
+    const float band = t.second * (1.f + kCountNearTolerance);
+    for (size_t i = 0; i < n; ++i)
+    {
+      if (i < lo || i > hi)
+      {
+        const bool is_local_min = (i == 0 || v[i - 1] >= v[i]) && (i + 1 == n || v[i + 1] >= v[i]);
+        if (is_local_min && v[i] <= band)
+        {
+          ++t.count_near;
+        }
+      }
+    }
+  }
+
   if (t.mi == 0 || t.mi + 1 == n)
   {
     // 邊界：真值可能在範圍外，不內插；曲率未定義，信心對折並套用歧義因子

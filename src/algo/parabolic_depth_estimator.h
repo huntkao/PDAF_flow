@@ -22,6 +22,13 @@ struct DepthEstimateTrace
   float second = 0.f; // basin 外最低成本；無競爭谷時為 +inf
   float unamb = 0.f;
 
+  // basin 外、深度落在「與最接近競爭谷（second）同一容忍帶」內的局部極小值個數。
+  // unamb 只看 second 有多深，量不到 repeat pattern 常見的「多個近乎打平的競爭谷」；
+  // 見 docs/m2-repeat-pattern-confidence/ 的合成資料推演：同一 unamb 下，count_near
+  // 越多，跨 frame 雜訊造成 argmin 誤判（AF hunting）的機率越高，且該效應近似指數放大。
+  // 目前僅作為診斷輸出，尚未接入 confidence 或下游仲裁邏輯。
+  int count_near = 0;
+
   // interior（非邊界）才有效
   float c_m1 = 0.f, c_0 = 0.f, c_p1 = 0.f;
   float sharp = 0.f;
