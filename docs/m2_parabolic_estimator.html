@@ -203,11 +203,11 @@
     <!-- 7 程式碼 -->
     <section class="slide">
       <p class="kicker">對應程式碼</p>
-      <h2>estimate() 的決策流程</h2>
+      <h2>estimateTraced() 的決策流程</h2>
       <div class="row" style="align-items:flex-start;">
         <div class="col" style="flex:1.25;">
           <pre class="code"><span class="c">// src/algo/parabolic_depth_estimator.cpp</span>
-DepthEstimate estimate(const CostSequence&amp; cost){
+DepthEstimateTrace estimateTraced(const CostSequence&amp; cost) <span class="k">const</span> {
   <span class="k">if</span>(v.size()&lt;3 || valid_samples&lt;=0) <span class="k">return</span> {}; <span class="c">// invalid</span>
   mi=argmin(v); mean=average(v);
   <span class="k">if</span>(mean &lt; 1e-6) <span class="k">return</span> {};              <span class="c">// 無紋理</span>
@@ -215,13 +215,16 @@ DepthEstimate estimate(const CostSequence&amp; cost){
   [lo,hi]= basin_walk(v, mi);               <span class="g">// 主谷 basin</span>
   second = min(v outside [lo,hi]);          <span class="g">// 次低點</span>
   unamb  = clamp((second-v[mi])/(mean-v[mi]),0,1);
+  count_near = countLocalMinsNear(v, [lo,hi], second, tol=0.10); <span class="g">// 診斷欄位，未接入 conf</span>
   <span class="k">if</span>(mi==0 || mi==last)                     <span class="c">// 邊界</span>
-    <span class="k">return</span> {shift_min+mi, depth*unamb*0.5f, true};
+    <span class="k">return</span> {result:{shift_min+mi, depth*unamb*0.5f, true}, ...};
   δ      = 0.5*(c₋₁-c₊₁)/(c₋₁-2c₀+c₊₁);     <span class="h">// sub-pixel</span>
   sharp  = clamp(1 - 2c₀/(c₋₁+c₊₁), 0,1);   <span class="h">// 曲率</span>
   conf   = depth * unamb * (0.5+0.5*sharp); <span class="c">// 三因子</span>
-  <span class="k">return</span> {shift_min+mi+δ, conf, true};
-}</pre>
+  <span class="k">return</span> {result:{shift_min+mi+δ, conf, true}, mi, depth, unamb, sharp, δ, ...};
+}
+<span class="c">// estimate() 只是薄封裝，所有中間值只算一次：</span>
+DepthEstimate estimate(const CostSequence&amp; cost){ <span class="k">return</span> estimateTraced(cost).result; }</pre>
         </div>
         <div class="col">
           <ul class="pts">
@@ -230,6 +233,7 @@ DepthEstimate estimate(const CostSequence&amp; cost){
             <li><b>信心 = 深度 × 無歧義 × 曲率</b>：分別擋掉離焦/無紋理、aliasing 歧義、寬谷低精度</li>
             <li class="m"><b>basin-walk</b> 讓寬谷不被誤判成歧義</li>
             <li>退化路徑全部<b>回傳合法結果</b>，絕不丟例外</li>
+            <li>所有邏輯只活在 <b>estimateTraced()</b> 裡；<code class="inl">estimate()</code> 只回傳 <code class="inl">.result</code>，讓 <code class="inl">pdaf_cost_viz</code> 顯示的中間值與正式路徑保證一致</li>
           </ul>
         </div>
       </div>
